@@ -1,8 +1,8 @@
 {
   "name": "@waitkit/core",
   "version": "0.0.0",
-  "type": "module",
   "description": "Development-only fetch interceptor for testing loading, error, and timeout states.",
+  "type": "module",
   "license": "MIT",
   "author": "junjuny0227",
   "homepage": "https://github.com/junjuny0227/waitkit#readme",
@@ -13,6 +13,14 @@
   "bugs": {
     "url": "https://github.com/junjuny0227/waitkit/issues"
   },
+  "keywords": [
+    "fetch",
+    "network",
+    "latency",
+    "loading",
+    "timeout",
+    "testing"
+  ],
   "exports": {
     ".": {
       "import": {
@@ -31,24 +39,16 @@
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "test": "vitest run",
-    "check-types": "tsc --noEmit"
-  },
-  "keywords": [
-    "fetch",
-    "network",
-    "latency",
-    "loading",
-    "timeout",
-    "testing"
-  ],
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@waitkit/eslint-config": "workspace:*",

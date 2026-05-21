@@ -1,11 +1,11 @@
-import type { DelayValue } from "./types";
+import type { DelayValue } from './types';
 
 export function resolveDelay(delay: DelayValue | undefined): number {
   if (delay === undefined) {
     return 0;
   }
 
-  if (typeof delay === "number") {
+  if (typeof delay === 'number') {
     return delay;
   }
 
@@ -24,19 +24,17 @@ export function validateDelay(delay: DelayValue | undefined): void {
     return;
   }
 
-  if (typeof delay === "number") {
-    assertNonNegativeFiniteNumber(delay, "delay");
+  if (typeof delay === 'number') {
+    assertNonNegativeFiniteNumber(delay, 'delay');
     return;
   }
 
   const [min, max] = delay;
-  assertNonNegativeFiniteNumber(min, "delay min");
-  assertNonNegativeFiniteNumber(max, "delay max");
+  assertNonNegativeFiniteNumber(min, 'delay min');
+  assertNonNegativeFiniteNumber(max, 'delay max');
 
   if (min > max) {
-    throw new Error(
-      "WaitKit delay range must have min less than or equal to max.",
-    );
+    throw new Error('WaitKit delay range must have min less than or equal to max.');
   }
 }
 
@@ -55,7 +53,7 @@ export function validateTimeoutMs(timeoutMs: number | undefined): void {
     return;
   }
 
-  assertNonNegativeFiniteNumber(timeoutMs, "timeoutMs");
+  assertNonNegativeFiniteNumber(timeoutMs, 'timeoutMs');
 }
 
 function assertNonNegativeFiniteNumber(value: number, name: string): void {

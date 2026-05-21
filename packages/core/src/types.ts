@@ -2,14 +2,7 @@ export type DelayValue = number | readonly [min: number, max: number];
 
 export type UrlMatcher = string | RegExp | ((url: string) => boolean);
 
-export type HttpMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE"
-  | "OPTIONS"
-  | "HEAD";
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 
 export interface WaitKitErrorResponse {
   status?: number;

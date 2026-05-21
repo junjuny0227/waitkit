@@ -1,13 +1,7 @@
-import {
-  resolveDelay,
-  sleep,
-  validateDelay,
-  validateRate,
-  validateTimeoutMs,
-} from "./delay";
-import { WaitKitTimeoutError } from "./errors";
-import { getRequestMethod, getRequestUrl, matchesRule } from "./matcher";
-import { createErrorResponse } from "./response";
+import { resolveDelay, sleep, validateDelay, validateRate, validateTimeoutMs } from './delay';
+import { WaitKitTimeoutError } from './errors';
+import { getRequestMethod, getRequestUrl, matchesRule } from './matcher';
+import { createErrorResponse } from './response';
 import type {
   WaitKitController,
   WaitKitErrorEvent,
@@ -15,7 +9,7 @@ import type {
   WaitKitOptions,
   WaitKitRequestEvent,
   WaitKitRule,
-} from "./types";
+} from './types';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -36,31 +30,19 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
     const requestEvent = createRequestEvent(input, init);
     options.onRequest?.(requestEvent);
 
-    const rule = findMatchingRule(
-      getActiveRules(),
-      requestEvent.url,
-      requestEvent.method,
-    );
+    const rule = findMatchingRule(getActiveRules(), requestEvent.url, requestEvent.method);
 
     if (rule === undefined) {
       return originalFetch.call(globalThis, input, init);
     }
 
     const delayMs = resolveDelay(rule.delay);
-    const matchEvent = createMatchEvent(
-      requestEvent,
-      rule,
-      activeScenario,
-      delayMs,
-    );
+    const matchEvent = createMatchEvent(requestEvent, rule, activeScenario, delayMs);
     options.onMatch?.(matchEvent);
 
     if (delayMs > 0) {
       options.onDelayStart?.(matchEvent);
-      debug(
-        options,
-        `${requestEvent.method} ${requestEvent.url} delayed by ${delayMs}ms`,
-      );
+      debug(options, `${requestEvent.method} ${requestEvent.url} delayed by ${delayMs}ms`);
       await sleep(delayMs);
       options.onDelayEnd?.(matchEvent);
     }
@@ -71,10 +53,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
         `WaitKit timed out ${requestEvent.method} ${requestEvent.url} after ${timeoutMs}ms.`,
       );
       emitError(options, matchEvent, error);
-      debug(
-        options,
-        `${requestEvent.method} ${requestEvent.url} timed out after ${timeoutMs}ms`,
-      );
+      debug(options, `${requestEvent.method} ${requestEvent.url} timed out after ${timeoutMs}ms`);
       await sleep(timeoutMs);
       throw error;
     }
@@ -85,10 +64,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
         `WaitKit simulated ${response.status} response for ${requestEvent.method} ${requestEvent.url}.`,
       );
       emitError(options, matchEvent, error);
-      debug(
-        options,
-        `${requestEvent.method} ${requestEvent.url} returned ${response.status}`,
-      );
+      debug(options, `${requestEvent.method} ${requestEvent.url} returned ${response.status}`);
       return response;
     }
 
@@ -145,12 +121,12 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
 }
 
 function validateRuntime(): void {
-  if (typeof globalThis.fetch !== "function") {
-    throw new Error("WaitKit requires globalThis.fetch.");
+  if (typeof globalThis.fetch !== 'function') {
+    throw new Error('WaitKit requires globalThis.fetch.');
   }
 
-  if (typeof Response !== "function") {
-    throw new Error("WaitKit requires globalThis.Response.");
+  if (typeof Response !== 'function') {
+    throw new Error('WaitKit requires globalThis.Response.');
   }
 }
 
@@ -167,17 +143,15 @@ function validateOptions(options: WaitKitOptions): void {
     options.activeScenario !== undefined &&
     options.scenarios?.[options.activeScenario] === undefined
   ) {
-    throw new Error(
-      `WaitKit scenario "${options.activeScenario}" does not exist.`,
-    );
+    throw new Error(`WaitKit scenario "${options.activeScenario}" does not exist.`);
   }
 }
 
 function validateRules(rules: readonly WaitKitRule[]): void {
   for (const rule of rules) {
     validateDelay(rule.delay);
-    validateRate(rule.errorRate, "errorRate");
-    validateRate(rule.timeoutRate, "timeoutRate");
+    validateRate(rule.errorRate, 'errorRate');
+    validateRate(rule.timeoutRate, 'timeoutRate');
     validateTimeoutMs(rule.timeoutMs);
     validateStatus(rule.errorResponse?.status);
   }
@@ -189,16 +163,11 @@ function validateStatus(status: number | undefined): void {
   }
 
   if (!Number.isInteger(status) || status < 200 || status > 599) {
-    throw new Error(
-      "WaitKit errorResponse.status must be an integer between 200 and 599.",
-    );
+    throw new Error('WaitKit errorResponse.status must be an integer between 200 and 599.');
   }
 }
 
-function createRequestEvent(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-): WaitKitRequestEvent {
+function createRequestEvent(input: RequestInfo | URL, init?: RequestInit): WaitKitRequestEvent {
   return {
     input,
     init,
@@ -241,11 +210,7 @@ function shouldTrigger(rate: number | undefined): boolean {
   return Math.random() < rate;
 }
 
-function emitError(
-  options: WaitKitOptions,
-  matchEvent: WaitKitMatchEvent,
-  error: Error,
-): void {
+function emitError(options: WaitKitOptions, matchEvent: WaitKitMatchEvent, error: Error): void {
   const errorEvent: WaitKitErrorEvent = {
     ...matchEvent,
     error,

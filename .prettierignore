@@ -1,0 +1,12 @@
+dist/
+build/
+public/
+
+node_modules/
+
+*.d.ts
+
+pnpm-lock.yaml
+package-lock.json
+
+.DS_Store
