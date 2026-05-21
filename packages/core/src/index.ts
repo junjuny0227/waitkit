@@ -12,4 +12,6 @@ export type {
   WaitKitOptions,
   WaitKitRequestEvent,
   WaitKitRule,
+  WaitKitScenarioChangeEvent,
+  WaitKitScenarioChangeReason,
 } from './types';

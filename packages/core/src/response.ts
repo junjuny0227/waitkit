@@ -1,15 +1,19 @@
 import type { WaitKitErrorResponse } from './types';
 
 export function createErrorResponse(errorResponse: WaitKitErrorResponse | undefined): Response {
-  const status = errorResponse?.status ?? 500;
-  const headers = new Headers(errorResponse?.headers);
-  const body = serializeBody(errorResponse?.body, headers);
+  try {
+    const status = errorResponse?.status ?? 500;
+    const headers = new Headers(errorResponse?.headers);
+    const body = serializeBody(errorResponse?.body, headers);
 
-  return new Response(body, {
-    status,
-    statusText: errorResponse?.statusText,
-    headers,
-  });
+    return new Response(body, {
+      status,
+      statusText: errorResponse?.statusText,
+      headers,
+    });
+  } catch (error) {
+    throw createResponseError(error);
+  }
 }
 
 function serializeBody(body: unknown, headers: Headers): BodyInit | null {
@@ -42,4 +46,12 @@ function isFormData(body: unknown): body is FormData {
 
 function isUrlSearchParams(body: unknown): body is URLSearchParams {
   return typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams;
+}
+
+function createResponseError(error: unknown): Error {
+  const reason = error instanceof Error ? error.message : String(error);
+
+  return new Error(`WaitKit failed to create simulated error response: ${reason}`, {
+    cause: error,
+  });
 }

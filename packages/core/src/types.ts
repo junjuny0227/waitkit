@@ -40,6 +40,14 @@ export interface WaitKitErrorEvent extends WaitKitMatchEvent {
   error: Error;
 }
 
+export type WaitKitScenarioChangeReason = 'setScenario' | 'resetScenario';
+
+export interface WaitKitScenarioChangeEvent {
+  previousScenario?: string;
+  scenario?: string;
+  reason: WaitKitScenarioChangeReason;
+}
+
 export interface WaitKitOptions {
   enabled?: boolean;
   rules?: readonly WaitKitRule[];
@@ -51,6 +59,7 @@ export interface WaitKitOptions {
   onDelayStart?: (event: WaitKitDelayEvent) => void;
   onDelayEnd?: (event: WaitKitDelayEvent) => void;
   onError?: (event: WaitKitErrorEvent) => void;
+  onScenarioChange?: (event: WaitKitScenarioChangeEvent) => void;
 }
 
 export interface WaitKitController {
