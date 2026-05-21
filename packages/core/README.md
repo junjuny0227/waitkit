@@ -95,6 +95,11 @@ waitkit.restore();
 
 ## Error Responses
 
+Object bodies are serialized as JSON and receive `content-type:
+application/json` when no content type is already provided.
+When `statusText` is omitted, Waitkit uses the runtime `Response` default for
+the configured status.
+
 ```ts
 setupWaitKit({
   enabled: import.meta.env.DEV,
@@ -114,12 +119,19 @@ setupWaitKit({
 
 ## Timeouts
 
+Timeout rules throw a `WaitKitTimeoutError`. If a rule also has `delay`,
+Waitkit waits for the delay first and then waits for `timeoutMs`, so the total
+simulated wait can be `delay + timeoutMs`.
+
 ```ts
 setupWaitKit({
   enabled: import.meta.env.DEV,
   rules: [{ url: '/api/report', timeoutRate: 1, timeoutMs: 5000 }],
 });
 ```
+
+Waitkit does not currently cancel simulated delay or timeout sleeps when a
+request `AbortSignal` aborts.
 
 ## Controller API
 
@@ -145,6 +157,25 @@ setupWaitKit({
 
 The first matching rule is applied.
 
+## Rule Matching
+
+String, `RegExp`, and predicate URL matchers receive the request's full URL
+string, including any query string. Use a predicate matcher if you want to
+match only part of the URL.
+
+```ts
+setupWaitKit({
+  rules: [
+    {
+      url: (url) => new URL(url, window.location.origin).pathname === '/api/users',
+      delay: 1000,
+    },
+  ],
+});
+```
+
+When multiple rules match a request, the first matching rule in the array wins.
+
 ## Events
 
 ```ts
@@ -156,8 +187,22 @@ setupWaitKit({
   onDelayStart: (event) => console.log(event.delayMs),
   onDelayEnd: (event) => console.log(event.delayMs),
   onError: (event) => console.error(event.error),
+  onScenarioChange: (event) => console.log(event.scenario),
 });
 ```
+
+Event payloads include the original `input` and `init`, normalized `url` and
+`method`, and match events also include the matched `rule`, active `scenario`
+name, and resolved `delayMs`. `onError` additionally receives the simulated
+`error`.
+
+The request lifecycle event names are stable: `onRequest`, `onMatch`,
+`onDelayStart`, `onDelayEnd`, and `onError`.
+
+`onScenarioChange` runs when `setScenario()` or `resetScenario()` is called. It
+does not run for the initial `activeScenario` value passed to `setupWaitKit`.
+Its payload includes `previousScenario`, `scenario`, and `reason`
+(`setScenario` or `resetScenario`).
 
 ## Production Safety
 
