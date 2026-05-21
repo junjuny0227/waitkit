@@ -9,6 +9,7 @@ import type {
   WaitKitOptions,
   WaitKitRequestEvent,
   WaitKitRule,
+  WaitKitScenarioChangeReason,
 } from './types';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -109,13 +110,17 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
         throw new Error(`WaitKit scenario "${name}" does not exist.`);
       }
 
+      const previousScenario = activeScenario;
       activeScenario = name;
+      emitScenarioChange(options, previousScenario, activeScenario, 'setScenario');
     },
     getScenario() {
       return activeScenario;
     },
     resetScenario() {
+      const previousScenario = activeScenario;
       activeScenario = undefined;
+      emitScenarioChange(options, previousScenario, activeScenario, 'resetScenario');
     },
   };
 }
@@ -217,6 +222,19 @@ function emitError(options: WaitKitOptions, matchEvent: WaitKitMatchEvent, error
   };
 
   options.onError?.(errorEvent);
+}
+
+function emitScenarioChange(
+  options: WaitKitOptions,
+  previousScenario: string | undefined,
+  scenario: string | undefined,
+  reason: WaitKitScenarioChangeReason,
+): void {
+  options.onScenarioChange?.({
+    previousScenario,
+    scenario,
+    reason,
+  });
 }
 
 function debug(options: WaitKitOptions, message: string): void {
