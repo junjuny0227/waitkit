@@ -1,0 +1,48 @@
+#!/bin/bash
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "[Waitkit Hook] Error: jq is required but not installed." >&2
+  exit 1
+fi
+
+INPUT=$(cat)
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+
+if [[ "$TOOL_NAME" != "Bash" ]]; then
+  exit 0
+fi
+
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+CWD=$(echo "$INPUT" | jq -r '.cwd // "."')
+if [ -z "$CWD" ]; then
+  CWD="."
+fi
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+LOG_FILE="$CWD/.claude/command.log"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+echo "[$TIMESTAMP] $COMMAND" >> "$LOG_FILE"
+
+BLOCKED_PATTERNS=(
+  "rm -rf[[:space:]]*/"
+  "sudo rm"
+  "> /dev/"
+  "dd if="
+  "mkfs"
+  "curl.*\\|[[:space:]]*sh"
+  "wget.*\\|[[:space:]]*sh"
+  "git reset --hard"
+  "git checkout --"
+  "pnpm release"
+  "changeset publish"
+  "npm publish"
+)
+
+for pattern in "${BLOCKED_PATTERNS[@]}"; do
+  if [[ "$COMMAND" =~ $pattern ]]; then
+    echo "[Waitkit Hook] Blocked dangerous command: $COMMAND" >&2
+    exit 2
+  fi
+done
+
+exit 0
