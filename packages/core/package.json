@@ -3,11 +3,26 @@
   "version": "0.0.0",
   "type": "module",
   "description": "Development-only fetch interceptor for testing loading, error, and timeout states.",
+  "license": "MIT",
+  "author": "junjuny0227",
+  "homepage": "https://github.com/junjuny0227/waitkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/junjuny0227/waitkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/junjuny0227/waitkit/issues"
+  },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "main": "./dist/index.cjs",
@@ -20,6 +35,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "check-types": "tsc --noEmit"
   },
@@ -31,7 +47,6 @@
     "timeout",
     "testing"
   ],
-  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },

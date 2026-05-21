@@ -1,5 +1,5 @@
-export { setupWaitKit } from './setup-wait-kit.js';
-export { WaitKitTimeoutError } from './errors.js';
+export { setupWaitKit } from "./setup-wait-kit";
+export { WaitKitTimeoutError } from "./errors";
 export type {
   DelayValue,
   HttpMethod,
@@ -12,4 +12,4 @@ export type {
   WaitKitOptions,
   WaitKitRequestEvent,
   WaitKitRule,
-} from './types.js';
+} from "./types";

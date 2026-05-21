@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { setupWaitKit, WaitKitTimeoutError } from "../src/index.js";
+import { setupWaitKit, WaitKitTimeoutError } from "../src";
 
 const nativeFetch = globalThis.fetch;
 
@@ -77,7 +77,8 @@ describe("setupWaitKit", () => {
     });
 
     const promise = fetch("/api/report");
-    const expectation = expect(promise).rejects.toBeInstanceOf(WaitKitTimeoutError);
+    const expectation =
+      expect(promise).rejects.toBeInstanceOf(WaitKitTimeoutError);
     await vi.advanceTimersByTimeAsync(5000);
 
     await expectation;

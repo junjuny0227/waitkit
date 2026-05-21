@@ -1,6 +1,8 @@
-import type { WaitKitErrorResponse } from "./types.js";
+import type { WaitKitErrorResponse } from "./types";
 
-export function createErrorResponse(errorResponse: WaitKitErrorResponse | undefined): Response {
+export function createErrorResponse(
+  errorResponse: WaitKitErrorResponse | undefined,
+): Response {
   const status = errorResponse?.status ?? 500;
   const headers = new Headers(errorResponse?.headers);
   const body = serializeBody(errorResponse?.body, headers);
@@ -21,7 +23,11 @@ function serializeBody(body: unknown, headers: Headers): BodyInit | null {
     return body;
   }
 
-  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body) || isUrlSearchParams(body)) {
+  if (
+    body instanceof ArrayBuffer ||
+    ArrayBuffer.isView(body) ||
+    isUrlSearchParams(body)
+  ) {
     return body as BodyInit;
   }
 
@@ -41,5 +47,7 @@ function isFormData(body: unknown): body is FormData {
 }
 
 function isUrlSearchParams(body: unknown): body is URLSearchParams {
-  return typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams;
+  return (
+    typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams
+  );
 }

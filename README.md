@@ -15,9 +15,7 @@ const waitkit = setupWaitKit({
   enabled: import.meta.env.DEV,
   activeScenario: "slow-network",
   scenarios: {
-    "slow-network": [
-      { url: "/api/users", method: "GET", delay: [800, 2000] },
-    ],
+    "slow-network": [{ url: "/api/users", method: "GET", delay: [800, 2000] }],
     "server-error": [
       {
         url: "/api/payment",

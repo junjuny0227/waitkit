@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { resolveDelay, validateDelay, validateRate } from "../src/delay.js";
+import { resolveDelay, validateDelay, validateRate } from "../src/delay";
 
 describe("resolveDelay", () => {
   it("returns fixed delays", () => {
@@ -20,7 +20,9 @@ describe("validateDelay", () => {
   });
 
   it("rejects inverted delay ranges", () => {
-    expect(() => validateDelay([300, 100])).toThrow("min less than or equal to max");
+    expect(() => validateDelay([300, 100])).toThrow(
+      "min less than or equal to max",
+    );
   });
 });
 

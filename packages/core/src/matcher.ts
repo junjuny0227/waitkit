@@ -1,6 +1,10 @@
-import type { WaitKitRule } from "./types.js";
+import type { WaitKitRule } from "./types";
 
-export function matchesRule(rule: WaitKitRule, url: string, method: string): boolean {
+export function matchesRule(
+  rule: WaitKitRule,
+  url: string,
+  method: string,
+): boolean {
   return matchesUrl(rule.url, url) && matchesMethod(rule.method, method);
 }
 
@@ -16,7 +20,10 @@ function matchesUrl(ruleUrl: WaitKitRule["url"], url: string): boolean {
   return ruleUrl(url);
 }
 
-function matchesMethod(ruleMethod: WaitKitRule["method"], method: string): boolean {
+function matchesMethod(
+  ruleMethod: WaitKitRule["method"],
+  method: string,
+): boolean {
   if (ruleMethod === undefined) {
     return true;
   }
@@ -46,7 +53,10 @@ export function getRequestUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
-export function getRequestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+export function getRequestMethod(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): string {
   if (init?.method !== undefined) {
     return normalizeMethod(init.method);
   }

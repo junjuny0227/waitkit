@@ -1,4 +1,4 @@
-import type { DelayValue } from "./types.js";
+import type { DelayValue } from "./types";
 
 export function resolveDelay(delay: DelayValue | undefined): number {
   if (delay === undefined) {
@@ -34,7 +34,9 @@ export function validateDelay(delay: DelayValue | undefined): void {
   assertNonNegativeFiniteNumber(max, "delay max");
 
   if (min > max) {
-    throw new Error("WaitKit delay range must have min less than or equal to max.");
+    throw new Error(
+      "WaitKit delay range must have min less than or equal to max.",
+    );
   }
 }
 
