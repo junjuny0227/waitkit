@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "turbo run test",
     "check-types": "turbo run check-types",
     "changeset:version": "changeset version",
