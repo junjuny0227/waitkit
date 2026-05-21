@@ -1,5 +1,11 @@
 # @waitkit/core
 
+## 0.2.0
+
+### Minor Changes
+
+- Add scenario change events and document the finalized P1 core behavior, including rule matching, timeout/error semantics, response simulation handling, and event payloads.
+
 ## 0.1.1
 
 ### Patch Changes
