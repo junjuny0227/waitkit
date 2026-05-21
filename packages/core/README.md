@@ -26,8 +26,11 @@ regular dependency instead:
 
 ```bash
 npm install @waitkit/core
+# or
 pnpm add @waitkit/core
+# or
 yarn add @waitkit/core
+# or
 bun add @waitkit/core
 ```
 
