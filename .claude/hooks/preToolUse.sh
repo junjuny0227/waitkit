@@ -13,7 +13,10 @@ if [[ "$TOOL_NAME" != "Bash" ]]; then
 fi
 
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
-CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+CWD=$(echo "$INPUT" | jq -r '.cwd // "."')
+if [ -z "$CWD" ]; then
+  CWD="."
+fi
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 LOG_FILE="$CWD/.claude/command.log"
 
