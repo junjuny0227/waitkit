@@ -1,4 +1,4 @@
-import { useContext, useSyncExternalStore } from 'react';
+import { useContext, useMemo, useSyncExternalStore } from 'react';
 
 import { WaitKitContext } from './wait-kit-context';
 import type { WaitKitReactController } from './wait-kit-store';
@@ -12,11 +12,14 @@ export function useWaitKit(): WaitKitReactController {
 
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 
-  return {
-    ...state,
-    controller: store.controller,
-    enable: store.enable,
-    disable: store.disable,
-    restore: store.restore,
-  };
+  return useMemo(
+    () => ({
+      ...state,
+      controller: store.controller,
+      enable: store.enable,
+      disable: store.disable,
+      restore: store.restore,
+    }),
+    [state, store],
+  );
 }

@@ -5,6 +5,8 @@ import { useMemo } from 'react';
 import { WaitKitContext } from './wait-kit-context';
 import { createWaitKitReactStore } from './wait-kit-store';
 
+const EMPTY_SCENARIO_NAMES: readonly string[] = [];
+
 export interface WaitKitProviderProps {
   controller: WaitKitController;
   scenarioNames?: readonly string[];
@@ -13,7 +15,7 @@ export interface WaitKitProviderProps {
 
 export function WaitKitProvider({
   controller,
-  scenarioNames = [],
+  scenarioNames = EMPTY_SCENARIO_NAMES,
   children,
 }: WaitKitProviderProps) {
   const store = useMemo(

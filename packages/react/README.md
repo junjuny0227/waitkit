@@ -28,6 +28,8 @@ const scenarios = {
   'server-error': [{ url: '/api/users', errorRate: 1 }],
 };
 
+const scenarioNames = Object.keys(scenarios);
+
 const waitkit = setupWaitKit({
   enabled: import.meta.env.DEV,
   activeScenario: 'slow-network',
@@ -35,11 +37,14 @@ const waitkit = setupWaitKit({
 });
 
 root.render(
-  <WaitKitProvider controller={waitkit} scenarioNames={Object.keys(scenarios)}>
+  <WaitKitProvider controller={waitkit} scenarioNames={scenarioNames}>
     <App />
   </WaitKitProvider>,
 );
 ```
+
+Pass a stable `scenarioNames` array. Avoid creating it inline during render,
+because changing the array reference recreates the React store.
 
 ## useWaitKit
 

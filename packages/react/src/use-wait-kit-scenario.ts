@@ -1,4 +1,4 @@
-import { useContext, useSyncExternalStore } from 'react';
+import { useContext, useMemo, useSyncExternalStore } from 'react';
 
 import { WaitKitContext } from './wait-kit-context';
 import type { WaitKitScenarioControls } from './wait-kit-store';
@@ -12,10 +12,13 @@ export function useWaitKitScenario(): WaitKitScenarioControls {
 
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 
-  return {
-    scenario: state.scenario,
-    scenarioNames: state.scenarioNames,
-    setScenario: store.setScenario,
-    resetScenario: store.resetScenario,
-  };
+  return useMemo(
+    () => ({
+      scenario: state.scenario,
+      scenarioNames: state.scenarioNames,
+      setScenario: store.setScenario,
+      resetScenario: store.resetScenario,
+    }),
+    [state, store],
+  );
 }
