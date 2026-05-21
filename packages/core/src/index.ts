@@ -1,5 +1,5 @@
-export { setupWaitKit } from './setup-wait-kit';
 export { WaitKitTimeoutError } from './errors';
+export { setupWaitKit } from './setup-wait-kit';
 export type {
   DelayValue,
   HttpMethod,
