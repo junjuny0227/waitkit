@@ -1,0 +1,12 @@
+{
+  "extends": "@waitkit/typescript-config/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@waitkit/core": ["../core/src/index.ts"]
+    }
+  },
+  "include": ["src", "tests", "tsup.config.ts", "vitest.config.ts", "eslint.config.mjs"],
+  "exclude": ["node_modules", "dist"]
+}
