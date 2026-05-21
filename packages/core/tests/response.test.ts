@@ -65,8 +65,19 @@ describe('createErrorResponse', () => {
     const body: { self?: unknown } = {};
     body.self = body;
 
-    expect(() => createErrorResponse({ body })).toThrow(
-      'WaitKit failed to create simulated error response',
+    let error: unknown;
+
+    try {
+      createErrorResponse({ body });
+    } catch (caughtError) {
+      error = caughtError;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toHaveProperty(
+      'message',
+      expect.stringContaining('WaitKit failed to create simulated error response'),
     );
+    expect(error).toHaveProperty('cause');
   });
 });

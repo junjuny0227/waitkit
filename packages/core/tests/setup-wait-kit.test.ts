@@ -303,6 +303,28 @@ describe('setupWaitKit', () => {
     expect(onScenarioChange).toHaveBeenCalledTimes(2);
   });
 
+  it('does not emit scenario change events for scenario no-ops', () => {
+    const onScenarioChange = vi.fn();
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      activeScenario: 'server-error',
+      scenarios: {
+        'server-error': [{ url: '/api/users', errorRate: 1 }],
+      },
+      onScenarioChange,
+    });
+
+    controller.setScenario('server-error');
+    expect(onScenarioChange).not.toHaveBeenCalled();
+
+    controller.resetScenario();
+    expect(onScenarioChange).toHaveBeenCalledTimes(1);
+
+    controller.resetScenario();
+    expect(onScenarioChange).toHaveBeenCalledTimes(1);
+  });
+
   it('does not emit scenario change events when setScenario fails', () => {
     const onScenarioChange = vi.fn();
     globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;

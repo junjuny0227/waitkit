@@ -110,6 +110,10 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
         throw new Error(`WaitKit scenario "${name}" does not exist.`);
       }
 
+      if (activeScenario === name) {
+        return;
+      }
+
       const previousScenario = activeScenario;
       activeScenario = name;
       emitScenarioChange(options, previousScenario, activeScenario, 'setScenario');
@@ -118,6 +122,10 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
       return activeScenario;
     },
     resetScenario() {
+      if (activeScenario === undefined) {
+        return;
+      }
+
       const previousScenario = activeScenario;
       activeScenario = undefined;
       emitScenarioChange(options, previousScenario, activeScenario, 'resetScenario');

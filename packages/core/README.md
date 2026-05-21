@@ -199,10 +199,11 @@ name, and resolved `delayMs`. `onError` additionally receives the simulated
 The request lifecycle event names are stable: `onRequest`, `onMatch`,
 `onDelayStart`, `onDelayEnd`, and `onError`.
 
-`onScenarioChange` runs when `setScenario()` or `resetScenario()` is called. It
-does not run for the initial `activeScenario` value passed to `setupWaitKit`.
-Its payload includes `previousScenario`, `scenario`, and `reason`
-(`setScenario` or `resetScenario`).
+`onScenarioChange` runs when `setScenario()` or `resetScenario()` changes the
+active scenario. It does not run for the initial `activeScenario` value passed
+to `setupWaitKit`, setting the same scenario again, or resetting when no
+scenario is active. Its payload includes `previousScenario`, `scenario`, and
+`reason` (`setScenario` or `resetScenario`).
 
 ## Production Safety
 

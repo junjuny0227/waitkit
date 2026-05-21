@@ -51,5 +51,7 @@ function isUrlSearchParams(body: unknown): body is URLSearchParams {
 function createResponseError(error: unknown): Error {
   const reason = error instanceof Error ? error.message : String(error);
 
-  return new Error(`WaitKit failed to create simulated error response: ${reason}`);
+  return new Error(`WaitKit failed to create simulated error response: ${reason}`, {
+    cause: error,
+  });
 }
