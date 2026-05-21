@@ -12,6 +12,12 @@ describe('resolveDelay', () => {
 
     expect(resolveDelay([100, 200])).toBe(150);
   });
+
+  it('can return the upper bound of a random delay range', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+
+    expect(resolveDelay([100, 200])).toBe(200);
+  });
 });
 
 describe('validateDelay', () => {

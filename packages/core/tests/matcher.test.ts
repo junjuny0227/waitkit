@@ -7,6 +7,12 @@ describe('matchesRule', () => {
     expect(matchesRule({ url: '/api/users' }, 'https://example.com/api/users', 'GET')).toBe(true);
   });
 
+  it('matches string URL fragments against query strings', () => {
+    expect(matchesRule({ url: 'page=2' }, 'https://example.com/api/users?page=2', 'GET')).toBe(
+      true,
+    );
+  });
+
   it('matches regular expressions', () => {
     expect(
       matchesRule({ url: /^https:\/\/api\.example\.com/ }, 'https://api.example.com/users', 'GET'),
@@ -17,6 +23,13 @@ describe('matchesRule', () => {
     expect(
       matchesRule({ url: (url: string) => url.endsWith('/health') }, '/api/health', 'GET'),
     ).toBe(true);
+  });
+
+  it('can ignore query strings with predicate matchers', () => {
+    const pathnameMatcher = (url: string) =>
+      new URL(url, 'https://waitkit.test').pathname === '/api/users';
+
+    expect(matchesRule({ url: pathnameMatcher }, '/api/users?page=2', 'GET')).toBe(true);
   });
 
   it('matches methods case-insensitively', () => {
