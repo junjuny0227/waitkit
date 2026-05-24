@@ -144,6 +144,24 @@ request `AbortSignal` aborts.
 - `setScenario(name)`: Uses a named scenario.
 - `getScenario()`: Returns the active scenario name.
 - `resetScenario()`: Clears the active scenario and falls back to `rules`.
+- `addEventListener(type, listener)`: Subscribes to an event. Returns an unsubscribe function.
+
+```ts
+const controller = setupWaitKit({
+  enabled: import.meta.env.DEV,
+  rules: [{ url: '/api/users', delay: 1000 }],
+});
+
+const unsubscribe = controller.addEventListener('match', (event) => {
+  console.log(event.url, event.delayMs);
+});
+
+// later
+unsubscribe();
+```
+
+Supported event types: `request`, `match`, `error`, `scenarioChange`.
+`addEventListener` is an alternative to the inline `onXxx` options and is useful when you need to attach or detach listeners dynamically at runtime.
 
 ## Rule Options
 

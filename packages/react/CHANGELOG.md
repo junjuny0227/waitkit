@@ -1,5 +1,18 @@
 # @waitkit/react
 
+## 0.3.0
+
+### Minor Changes
+
+- 574c944: Add `WaitKitDevTools` component — a fixed floating panel for development.
+
+  Shows current enabled/disabled state, scenario switcher, and a live log of recent matched and error requests. Accepts an optional `maxLogEntries` prop (default 20).
+
+### Patch Changes
+
+- Updated dependencies [574c944]
+  - @waitkit/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

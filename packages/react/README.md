@@ -97,6 +97,30 @@ function ScenarioSelect() {
 }
 ```
 
+## WaitKitDevTools
+
+`WaitKitDevTools` renders a fixed floating panel for development. It shows the
+current enabled/disabled status, a scenario switcher, and a live log of recent
+matched and error requests.
+
+```tsx
+import { WaitKitDevTools } from '@waitkit/react';
+
+root.render(
+  <WaitKitProvider controller={waitkit} scenarioNames={scenarioNames}>
+    <App />
+    <WaitKitDevTools />
+  </WaitKitProvider>,
+);
+```
+
+Props:
+
+- `maxLogEntries` (optional, default `20`): Maximum number of log entries to keep.
+
+`WaitKitDevTools` must be rendered inside `WaitKitProvider`. It reads state
+from context and calls controller methods directly — no additional setup needed.
+
 ## Controller Updates
 
 Use the methods returned by `useWaitKit` and `useWaitKitScenario` from React UI.

@@ -1,5 +1,15 @@
 # @waitkit/core
 
+## 0.3.0
+
+### Minor Changes
+
+- 574c944: Add `addEventListener` to `WaitKitController` for dynamic event subscription.
+
+  Returns an unsubscribe function. Supported event types: `request`, `match`, `error`, `scenarioChange`.
+
+  Also adds `WaitKitEventMap`, `WaitKitEventType`, and `WaitKitEventListener` types to the public API.
+
 ## 0.2.0
 
 ### Minor Changes
