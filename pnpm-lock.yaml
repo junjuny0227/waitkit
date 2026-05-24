@@ -23,6 +23,12 @@ importers:
 
   apps/example:
     dependencies:
+      '@waitkit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@waitkit/react':
+        specifier: workspace:*
+        version: link:../../packages/react
       react:
         specifier: ^19.2.6
         version: 19.2.6
