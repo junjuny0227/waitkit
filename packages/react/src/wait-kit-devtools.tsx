@@ -98,6 +98,7 @@ const styles = {
   logEntry: (kind: LogKind) => ({
     color: kind === 'error' ? '#f38ba8' : '#a6e3a1',
     padding: '1px 0',
+    minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
