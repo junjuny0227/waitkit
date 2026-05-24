@@ -20,6 +20,15 @@ interface LogEntry {
   delayMs: number;
 }
 
+const LOG_LIST_CLASS = 'waitkit-log-list';
+
+const scrollbarCSS = `
+  .${LOG_LIST_CLASS}::-webkit-scrollbar { width: 4px; }
+  .${LOG_LIST_CLASS}::-webkit-scrollbar-track { background: transparent; }
+  .${LOG_LIST_CLASS}::-webkit-scrollbar-thumb { background: #45475a; border-radius: 2px; }
+  .${LOG_LIST_CLASS}::-webkit-scrollbar-thumb:hover { background: #585b70; }
+`;
+
 const styles = {
   panel: {
     position: 'fixed' as const,
@@ -95,11 +104,14 @@ const styles = {
     flexDirection: 'column' as const,
     gap: 2,
     flexShrink: 0,
+    scrollbarWidth: 'thin' as const,
+    scrollbarColor: '#45475a transparent',
   },
   logEntry: (kind: LogKind) => ({
     color: kind === 'error' ? '#f38ba8' : '#a6e3a1',
     padding: '1px 0',
     minWidth: 0,
+    flexShrink: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
@@ -155,6 +167,7 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
 
   return (
     <div style={styles.panel}>
+      <style>{scrollbarCSS}</style>
       <div style={styles.header} onClick={() => setOpen((v) => !v)}>
         <span style={styles.headerLabel}>⬡ Waitkit</span>
         <button style={styles.toggleBtn} aria-label={open ? 'collapse' : 'expand'}>
@@ -196,7 +209,7 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
 
           <div>
             <div style={{ ...styles.label, marginBottom: 4 }}>Log</div>
-            <div style={styles.logList}>
+            <div style={styles.logList} className={LOG_LIST_CLASS}>
               {logs.length === 0 ? (
                 <span style={styles.empty}>no requests yet</span>
               ) : (
