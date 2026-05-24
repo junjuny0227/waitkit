@@ -411,3 +411,101 @@ describe('setupWaitKit', () => {
     );
   });
 });
+
+describe('addEventListener', () => {
+  it('fires a match listener when a fetch matches a rule', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', delay: 0 }],
+    });
+
+    const listener = vi.fn();
+    controller.addEventListener('match', listener);
+
+    await fetch('/api/users');
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/api/users', method: 'GET', delayMs: 0 }),
+    );
+  });
+
+  it('fires an error listener when a fetch triggers an error', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', errorRate: 1 }],
+    });
+
+    const listener = vi.fn();
+    controller.addEventListener('error', listener);
+
+    await fetch('/api/users');
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/api/users', error: expect.any(Error) }),
+    );
+  });
+
+  it('stops firing a listener after unsubscribe is called', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', delay: 0 }],
+    });
+
+    const listener = vi.fn();
+    const unsubscribe = controller.addEventListener('match', listener);
+
+    await fetch('/api/users');
+    expect(listener).toHaveBeenCalledOnce();
+
+    unsubscribe();
+    await fetch('/api/users');
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('fires a scenarioChange listener when setScenario is called', () => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      scenarios: {
+        slow: [{ url: '/api/users', delay: 500 }],
+        error: [{ url: '/api/users', errorRate: 1 }],
+      },
+    });
+
+    const listener = vi.fn();
+    controller.addEventListener('scenarioChange', listener);
+
+    controller.setScenario('slow');
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith({
+      previousScenario: undefined,
+      scenario: 'slow',
+      reason: 'setScenario',
+    });
+  });
+
+  it('calls both the options callback and an addEventListener listener for the same event', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const optionsListener = vi.fn();
+    const addedListener = vi.fn();
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', delay: 0 }],
+      onMatch: optionsListener,
+    });
+
+    controller.addEventListener('match', addedListener);
+
+    await fetch('/api/users');
+
+    expect(optionsListener).toHaveBeenCalledOnce();
+    expect(addedListener).toHaveBeenCalledOnce();
+  });
+});

@@ -5,6 +5,9 @@ import { createErrorResponse } from './response';
 import type {
   WaitKitController,
   WaitKitErrorEvent,
+  WaitKitEventListener,
+  WaitKitEventMap,
+  WaitKitEventType,
   WaitKitMatchEvent,
   WaitKitOptions,
   WaitKitRequestEvent,
@@ -23,6 +26,14 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
   let activeScenario = options.activeScenario;
   let restored = false;
 
+  const listenersMap = new Map<WaitKitEventType, Set<WaitKitEventListener<WaitKitEventType>>>();
+
+  function dispatch<K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]): void {
+    for (const fn of listenersMap.get(type) ?? []) {
+      (fn as WaitKitEventListener<K>)(event);
+    }
+  }
+
   const patchedFetch: typeof fetch = async (input, init) => {
     if (!enabled) {
       return originalFetch.call(globalThis, input, init);
@@ -30,6 +41,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
 
     const requestEvent = createRequestEvent(input, init);
     options.onRequest?.(requestEvent);
+    dispatch('request', requestEvent);
 
     const rule = findMatchingRule(getActiveRules(), requestEvent.url, requestEvent.method);
 
@@ -40,6 +52,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
     const delayMs = resolveDelay(rule.delay);
     const matchEvent = createMatchEvent(requestEvent, rule, activeScenario, delayMs);
     options.onMatch?.(matchEvent);
+    dispatch('match', matchEvent);
 
     if (delayMs > 0) {
       options.onDelayStart?.(matchEvent);
@@ -53,7 +66,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
       const error = new WaitKitTimeoutError(
         `WaitKit timed out ${requestEvent.method} ${requestEvent.url} after ${timeoutMs}ms.`,
       );
-      emitError(options, matchEvent, error);
+      emitError(options, dispatch, matchEvent, error);
       debug(options, `${requestEvent.method} ${requestEvent.url} timed out after ${timeoutMs}ms`);
       await sleep(timeoutMs);
       throw error;
@@ -64,7 +77,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
       const error = new Error(
         `WaitKit simulated ${response.status} response for ${requestEvent.method} ${requestEvent.url}.`,
       );
-      emitError(options, matchEvent, error);
+      emitError(options, dispatch, matchEvent, error);
       debug(options, `${requestEvent.method} ${requestEvent.url} returned ${response.status}`);
       return response;
     }
@@ -116,7 +129,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
 
       const previousScenario = activeScenario;
       activeScenario = name;
-      emitScenarioChange(options, previousScenario, activeScenario, 'setScenario');
+      emitScenarioChange(options, dispatch, previousScenario, activeScenario, 'setScenario');
     },
     getScenario() {
       return activeScenario;
@@ -128,7 +141,18 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
 
       const previousScenario = activeScenario;
       activeScenario = undefined;
-      emitScenarioChange(options, previousScenario, activeScenario, 'resetScenario');
+      emitScenarioChange(options, dispatch, previousScenario, activeScenario, 'resetScenario');
+    },
+    addEventListener<K extends WaitKitEventType>(type: K, listener: WaitKitEventListener<K>) {
+      if (!listenersMap.has(type)) {
+        listenersMap.set(type, new Set());
+      }
+
+      listenersMap.get(type)!.add(listener as WaitKitEventListener<WaitKitEventType>);
+
+      return () => {
+        listenersMap.get(type)?.delete(listener as WaitKitEventListener<WaitKitEventType>);
+      };
     },
   };
 }
@@ -223,26 +247,31 @@ function shouldTrigger(rate: number | undefined): boolean {
   return Math.random() < rate;
 }
 
-function emitError(options: WaitKitOptions, matchEvent: WaitKitMatchEvent, error: Error): void {
+function emitError(
+  options: WaitKitOptions,
+  dispatch: <K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]) => void,
+  matchEvent: WaitKitMatchEvent,
+  error: Error,
+): void {
   const errorEvent: WaitKitErrorEvent = {
     ...matchEvent,
     error,
   };
 
   options.onError?.(errorEvent);
+  dispatch('error', errorEvent);
 }
 
 function emitScenarioChange(
   options: WaitKitOptions,
+  dispatch: <K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]) => void,
   previousScenario: string | undefined,
   scenario: string | undefined,
   reason: WaitKitScenarioChangeReason,
 ): void {
-  options.onScenarioChange?.({
-    previousScenario,
-    scenario,
-    reason,
-  });
+  const event = { previousScenario, scenario, reason };
+  options.onScenarioChange?.(event);
+  dispatch('scenarioChange', event);
 }
 
 function debug(options: WaitKitOptions, message: string): void {
