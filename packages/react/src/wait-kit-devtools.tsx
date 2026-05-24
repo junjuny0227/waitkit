@@ -89,11 +89,12 @@ const styles = {
     margin: '2px 0',
   },
   logList: {
-    maxHeight: 160,
+    maxHeight: 150,
     overflowY: 'auto' as const,
     display: 'flex' as const,
     flexDirection: 'column' as const,
     gap: 2,
+    flexShrink: 0,
   },
   logEntry: (kind: LogKind) => ({
     color: kind === 'error' ? '#f38ba8' : '#a6e3a1',
