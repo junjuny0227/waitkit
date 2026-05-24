@@ -62,6 +62,17 @@ export interface WaitKitOptions {
   onScenarioChange?: (event: WaitKitScenarioChangeEvent) => void;
 }
 
+export interface WaitKitEventMap {
+  request: WaitKitRequestEvent;
+  match: WaitKitMatchEvent;
+  error: WaitKitErrorEvent;
+  scenarioChange: WaitKitScenarioChangeEvent;
+}
+
+export type WaitKitEventType = keyof WaitKitEventMap;
+
+export type WaitKitEventListener<K extends WaitKitEventType> = (event: WaitKitEventMap[K]) => void;
+
 export interface WaitKitController {
   enable: () => void;
   disable: () => void;
@@ -70,4 +81,8 @@ export interface WaitKitController {
   setScenario: (name: string) => void;
   getScenario: () => string | undefined;
   resetScenario: () => void;
+  addEventListener: <K extends WaitKitEventType>(
+    type: K,
+    listener: WaitKitEventListener<K>,
+  ) => () => void;
 }
