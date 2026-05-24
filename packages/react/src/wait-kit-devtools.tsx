@@ -13,7 +13,6 @@ type LogKind = 'match' | 'error';
 interface LogEntry {
   id: number;
   kind: LogKind;
-  timestamp: number;
   url: string;
   method: string;
   scenario: string | undefined;
@@ -107,6 +106,11 @@ const styles = {
     scrollbarWidth: 'thin' as const,
     scrollbarColor: '#45475a transparent',
   },
+  logLabel: {
+    color: '#a6adc8',
+    minWidth: 60,
+    marginBottom: 4,
+  },
   logEntry: (kind: LogKind) => ({
     color: kind === 'error' ? '#f38ba8' : '#a6e3a1',
     padding: '1px 0',
@@ -134,7 +138,6 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
       const entry: LogEntry = {
         id: ++counterRef.current,
         kind: 'match',
-        timestamp: Date.now(),
         url: event.url,
         method: event.method,
         scenario: event.scenario,
@@ -147,7 +150,6 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
       const entry: LogEntry = {
         id: ++counterRef.current,
         kind: 'error',
-        timestamp: Date.now(),
         url: event.url,
         method: event.method,
         scenario: event.scenario,
@@ -168,7 +170,15 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
   return (
     <div style={styles.panel}>
       <style>{scrollbarCSS}</style>
-      <div style={styles.header} onClick={() => setOpen((v) => !v)}>
+      <div
+        style={styles.header}
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') setOpen((v) => !v);
+        }}
+      >
         <span style={styles.headerLabel}>⬡ Waitkit</span>
         <button style={styles.toggleBtn} aria-label={open ? 'collapse' : 'expand'}>
           {open ? '▲' : '▼'}
@@ -208,7 +218,7 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
           <div style={styles.divider} />
 
           <div>
-            <div style={{ ...styles.label, marginBottom: 4 }}>Log</div>
+            <div style={styles.logLabel}>Log</div>
             <div style={styles.logList} className={LOG_LIST_CLASS}>
               {logs.length === 0 ? (
                 <span style={styles.empty}>no requests yet</span>
