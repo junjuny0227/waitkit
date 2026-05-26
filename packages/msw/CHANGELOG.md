@@ -1,5 +1,13 @@
 # @waitkit/msw
 
+## 0.1.2
+
+### Patch Changes
+
+- 25c8875: Replaced local implementations of `resolveDelay`, `sleep`, and `shouldTrigger` with imports from `@waitkit/core`. No behavior change.
+- Updated dependencies [25c8875]
+  - @waitkit/core@0.4.0
+
 ## 0.1.1
 
 ### Patch Changes

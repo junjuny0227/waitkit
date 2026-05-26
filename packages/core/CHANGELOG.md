@@ -1,5 +1,17 @@
 # @waitkit/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 25c8875: Added `delayStart` and `delayEnd` event types to `WaitKitEventMap`, enabling subscription via `addEventListener`.
+
+  Added `getScenarioNames(): readonly string[]` to `WaitKitController`. Returns the list of scenario names passed to `setupWaitKit`.
+
+  Exported `resolveDelay`, `sleep`, and `shouldTrigger` as part of the public API.
+
+  Added JSDoc to `UrlMatcher` documenting that string matchers use substring matching.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,18 @@
 # @waitkit/react
 
+## 0.4.0
+
+### Minor Changes
+
+- 25c8875: `WaitKitProvider` now auto-derives scenario names via `controller.getScenarioNames()` when the `scenarioNames` prop is omitted. The prop remains available as an explicit override.
+
+  Added a Restore button to `WaitKitDevTools`. Clicking it calls `controller.restore()` to reinstate the original fetch.
+
+### Patch Changes
+
+- Updated dependencies [25c8875]
+  - @waitkit/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
