@@ -22,8 +22,16 @@ timeout, and retry states.
 - `packages/core/src`: fetch interception, rule matching, response simulation,
   delay, errors, controller API, and public exports.
 - `packages/core/tests`: Vitest coverage for core behavior.
+- `packages/react`: publishable `@waitkit/react` package.
+- `packages/react/src`: WaitKitProvider, useWaitKit, useWaitKitScenario hooks,
+  WaitKitDevTools floating panel, and React store.
+- `packages/react/tests`: Vitest coverage for React integration.
+- `packages/msw`: publishable `@waitkit/msw` package.
+- `packages/msw/src`: withWaitKit HOF for MSW v2 resolver integration.
+- `packages/msw/tests`: Vitest coverage for MSW integration.
 - `packages/eslint-config`: shared ESLint config.
 - `packages/typescript-config`: shared TypeScript config.
+- `apps/example`: Vite + React example app demonstrating core and react packages.
 - `.changeset`: pending release notes.
 - `ROADMAP.md`: future development plan.
 
