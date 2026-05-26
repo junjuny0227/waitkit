@@ -1,4 +1,11 @@
-import { resolveDelay, sleep, validateDelay, validateRate, validateTimeoutMs } from './delay';
+import {
+  resolveDelay,
+  shouldTrigger,
+  sleep,
+  validateDelay,
+  validateRate,
+  validateTimeoutMs,
+} from './delay';
 import { WaitKitTimeoutError } from './errors';
 import { getRequestMethod, getRequestUrl, matchesRule } from './matcher';
 import { createErrorResponse } from './response';
@@ -22,6 +29,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
   validateOptions(options);
 
   const originalFetch = globalThis.fetch;
+  const scenarioNamesCache = Object.keys(options.scenarios ?? {});
   let enabled = options.enabled ?? true;
   let activeScenario = options.activeScenario;
   let restored = false;
@@ -56,9 +64,11 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
 
     if (delayMs > 0) {
       options.onDelayStart?.(matchEvent);
+      dispatch('delayStart', matchEvent);
       debug(options, `${requestEvent.method} ${requestEvent.url} delayed by ${delayMs}ms`);
       await sleep(delayMs);
       options.onDelayEnd?.(matchEvent);
+      dispatch('delayEnd', matchEvent);
     }
 
     if (shouldTrigger(rule.timeoutRate)) {
@@ -142,6 +152,9 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
       const previousScenario = activeScenario;
       activeScenario = undefined;
       emitScenarioChange(options, dispatch, previousScenario, activeScenario, 'resetScenario');
+    },
+    getScenarioNames() {
+      return scenarioNamesCache;
     },
     addEventListener<K extends WaitKitEventType>(type: K, listener: WaitKitEventListener<K>) {
       if (!listenersMap.has(type)) {
@@ -233,18 +246,6 @@ function findMatchingRule(
   method: string,
 ): WaitKitRule | undefined {
   return rules.find((rule) => matchesRule(rule, url, method));
-}
-
-function shouldTrigger(rate: number | undefined): boolean {
-  if (rate === undefined || rate <= 0) {
-    return false;
-  }
-
-  if (rate >= 1) {
-    return true;
-  }
-
-  return Math.random() < rate;
 }
 
 function emitError(

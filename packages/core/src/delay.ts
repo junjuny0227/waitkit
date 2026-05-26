@@ -61,3 +61,15 @@ function assertNonNegativeFiniteNumber(value: number, name: string): void {
     throw new Error(`WaitKit ${name} must be a non-negative finite number.`);
   }
 }
+
+export function shouldTrigger(rate: number | undefined): boolean {
+  if (rate === undefined || rate <= 0) {
+    return false;
+  }
+
+  if (rate >= 1) {
+    return true;
+  }
+
+  return Math.random() < rate;
+}

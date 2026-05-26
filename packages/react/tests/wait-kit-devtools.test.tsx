@@ -27,7 +27,7 @@ function createWrapper(
 }
 
 describe('WaitKitDevTools', () => {
-  it('renders Enabled and Disabled buttons', () => {
+  it('renders Enabled, Disabled, and Restore buttons', () => {
     const controller = setupWaitKit({ rules: [] });
     const wrapper = createWrapper(controller);
 
@@ -35,6 +35,7 @@ describe('WaitKitDevTools', () => {
 
     expect(screen.getByRole('button', { name: 'Enabled' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Disabled' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeTruthy();
   });
 
   it('renders scenario buttons when scenarioNames are provided', () => {
@@ -81,6 +82,23 @@ describe('WaitKitDevTools', () => {
     });
 
     expect(controller.isEnabled()).toBe(true);
+  });
+
+  it('restores the original fetch when Restore button is clicked', () => {
+    const fetchMock = vi.fn(async () => new Response('ok'));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const controller = setupWaitKit({ rules: [] });
+    const wrapper = createWrapper(controller);
+
+    render(<WaitKitDevTools />, { wrapper });
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    });
+
+    expect(controller.isEnabled()).toBe(false);
+    expect(globalThis.fetch).toBe(fetchMock);
   });
 
   it('changes scenario when a scenario button is clicked', () => {

@@ -1,5 +1,9 @@
 export type DelayValue = number | readonly [min: number, max: number];
 
+/**
+ * string: URL에 해당 문자열이 포함되면 매칭 (substring match).
+ * 정확한 경로나 패턴 제어는 RegExp 또는 함수를 사용.
+ */
 export type UrlMatcher = string | RegExp | ((url: string) => boolean);
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
@@ -65,6 +69,8 @@ export interface WaitKitOptions {
 export interface WaitKitEventMap {
   request: WaitKitRequestEvent;
   match: WaitKitMatchEvent;
+  delayStart: WaitKitDelayEvent;
+  delayEnd: WaitKitDelayEvent;
   error: WaitKitErrorEvent;
   scenarioChange: WaitKitScenarioChangeEvent;
 }
@@ -81,6 +87,7 @@ export interface WaitKitController {
   setScenario: (name: string) => void;
   getScenario: () => string | undefined;
   resetScenario: () => void;
+  getScenarioNames: () => readonly string[];
   addEventListener: <K extends WaitKitEventType>(
     type: K,
     listener: WaitKitEventListener<K>,

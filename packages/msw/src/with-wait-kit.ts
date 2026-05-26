@@ -1,4 +1,4 @@
-import { WaitKitTimeoutError } from '@waitkit/core';
+import { resolveDelay, shouldTrigger, sleep, WaitKitTimeoutError } from '@waitkit/core';
 import { type DefaultBodyType, HttpResponse, type HttpResponseResolver } from 'msw';
 
 import type { WaitKitMswRule } from './types';
@@ -33,31 +33,6 @@ export function withWaitKit<
 
     return resolver(args);
   }) as HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>;
-}
-
-function resolveDelay(delay: NonNullable<WaitKitMswRule['delay']>): number {
-  if (typeof delay === 'number') {
-    return delay;
-  }
-
-  const [min, max] = delay;
-  return Math.floor(min + Math.random() * (max - min + 1));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function shouldTrigger(rate: number | undefined): boolean {
-  if (rate === undefined || rate <= 0) {
-    return false;
-  }
-
-  if (rate >= 1) {
-    return true;
-  }
-
-  return Math.random() < rate;
 }
 
 function createErrorResponse(
