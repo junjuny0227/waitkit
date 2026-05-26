@@ -1,15 +1,20 @@
 import { WaitKitTimeoutError } from '@waitkit/core';
-import { HttpResponse, type HttpResponseResolver } from 'msw';
+import { type DefaultBodyType, HttpResponse, type HttpResponseResolver } from 'msw';
 
 import type { WaitKitMswRule } from './types';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-export function withWaitKit(
+export function withWaitKit<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Params extends Record<string, any> = any,
+  RequestBodyType extends DefaultBodyType = DefaultBodyType,
+  ResponseBodyType extends DefaultBodyType = DefaultBodyType,
+>(
   rule: WaitKitMswRule,
-  resolver: HttpResponseResolver,
-): HttpResponseResolver {
-  return async (args) => {
+  resolver: HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>,
+): HttpResponseResolver<Params, RequestBodyType, ResponseBodyType> {
+  return (async (args) => {
     if (rule.delay !== undefined) {
       await sleep(resolveDelay(rule.delay));
     }
@@ -27,7 +32,7 @@ export function withWaitKit(
     }
 
     return resolver(args);
-  };
+  }) as HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>;
 }
 
 function resolveDelay(delay: NonNullable<WaitKitMswRule['delay']>): number {
@@ -57,7 +62,7 @@ function shouldTrigger(rate: number | undefined): boolean {
 
 function createErrorResponse(
   errorResponse: WaitKitMswRule['errorResponse'],
-): HttpResponse<BodyInit | null> {
+): HttpResponse<DefaultBodyType> {
   const status = errorResponse?.status ?? 500;
   const headers = new Headers(errorResponse?.headers);
   const body = serializeBody(errorResponse?.body, headers);
