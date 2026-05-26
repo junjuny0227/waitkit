@@ -29,6 +29,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
   validateOptions(options);
 
   const originalFetch = globalThis.fetch;
+  const scenarioNamesCache = Object.keys(options.scenarios ?? {});
   let enabled = options.enabled ?? true;
   let activeScenario = options.activeScenario;
   let restored = false;
@@ -153,7 +154,7 @@ export function setupWaitKit(options: WaitKitOptions): WaitKitController {
       emitScenarioChange(options, dispatch, previousScenario, activeScenario, 'resetScenario');
     },
     getScenarioNames() {
-      return Object.keys(options.scenarios ?? {});
+      return scenarioNamesCache;
     },
     addEventListener<K extends WaitKitEventType>(type: K, listener: WaitKitEventListener<K>) {
       if (!listenersMap.has(type)) {
