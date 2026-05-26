@@ -1,6 +1,6 @@
 {
   "name": "@waitkit/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Development-only fetch interceptor for testing loading, error, and timeout states.",
   "type": "module",
   "license": "MIT",

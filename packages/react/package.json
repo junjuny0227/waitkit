@@ -1,6 +1,6 @@
 {
   "name": "@waitkit/react",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "React provider and hooks for Waitkit controllers.",
   "type": "module",
   "license": "MIT",
