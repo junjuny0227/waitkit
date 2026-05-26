@@ -1,5 +1,11 @@
 # @waitkit/msw
 
+## 0.1.1
+
+### Patch Changes
+
+- Update README to English to match other Waitkit packages.
+
 ## 0.1.0
 
 ### Minor Changes
