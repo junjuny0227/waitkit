@@ -490,6 +490,62 @@ describe('addEventListener', () => {
     });
   });
 
+  it('fires a request listener on every fetch', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', delay: 0 }],
+    });
+
+    const listener = vi.fn();
+    controller.addEventListener('request', listener);
+
+    await fetch('/api/users');
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/api/users', method: 'GET' }),
+    );
+  });
+
+  it('fires a delayStart listener when a fetch is delayed', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', delay: 100 }],
+    });
+
+    const listener = vi.fn();
+    controller.addEventListener('delayStart', listener);
+
+    const promise = fetch('/api/users');
+    expect(listener).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(100);
+    await promise;
+  });
+
+  it('fires a delayEnd listener after delay completes', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+
+    const controller = setupWaitKit({
+      rules: [{ url: '/api/users', delay: 100 }],
+    });
+
+    const listener = vi.fn();
+    controller.addEventListener('delayEnd', listener);
+
+    const promise = fetch('/api/users');
+    expect(listener).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(100);
+    await promise;
+
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   it('calls both the options callback and an addEventListener listener for the same event', async () => {
     globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
 

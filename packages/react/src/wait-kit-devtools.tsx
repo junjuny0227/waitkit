@@ -127,7 +127,7 @@ const styles = {
 };
 
 export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
-  const { controller, enabled, enable, disable } = useWaitKit();
+  const { controller, enabled, enable, disable, restore } = useWaitKit();
   const { scenario, scenarioNames, setScenario, resetScenario } = useWaitKitScenario();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [open, setOpen] = useState(true);
@@ -194,6 +194,9 @@ export function WaitKitDevTools({ maxLogEntries = 20 }: WaitKitDevToolsProps) {
             </button>
             <button style={styles.btn(!enabled, '#f38ba8')} onClick={disable}>
               Disabled
+            </button>
+            <button style={styles.btn(false, '#cba6f7')} onClick={restore}>
+              Restore
             </button>
           </div>
 

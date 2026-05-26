@@ -5,22 +5,21 @@ import { useMemo } from 'react';
 import { WaitKitContext } from './wait-kit-context';
 import { createWaitKitReactStore } from './wait-kit-store';
 
-const EMPTY_SCENARIO_NAMES: readonly string[] = [];
-
 export interface WaitKitProviderProps {
   controller: WaitKitController;
   scenarioNames?: readonly string[];
   children: ReactNode;
 }
 
-export function WaitKitProvider({
-  controller,
-  scenarioNames = EMPTY_SCENARIO_NAMES,
-  children,
-}: WaitKitProviderProps) {
-  const store = useMemo(
-    () => createWaitKitReactStore(controller, scenarioNames),
+export function WaitKitProvider({ controller, scenarioNames, children }: WaitKitProviderProps) {
+  const effectiveNames = useMemo(
+    () => scenarioNames ?? controller.getScenarioNames(),
     [controller, scenarioNames],
+  );
+
+  const store = useMemo(
+    () => createWaitKitReactStore(controller, effectiveNames),
+    [controller, effectiveNames],
   );
 
   return <WaitKitContext.Provider value={store}>{children}</WaitKitContext.Provider>;
