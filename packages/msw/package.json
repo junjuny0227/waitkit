@@ -1,6 +1,6 @@
 {
   "name": "@waitkit/msw",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Waitkit delay/error/timeout simulation for MSW handlers.",
   "type": "module",
   "license": "MIT",

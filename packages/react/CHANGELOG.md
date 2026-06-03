@@ -1,5 +1,12 @@
 # @waitkit/react
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [a71c233]
+  - @waitkit/core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

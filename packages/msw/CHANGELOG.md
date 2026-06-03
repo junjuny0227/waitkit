@@ -1,5 +1,12 @@
 # @waitkit/msw
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [a71c233]
+  - @waitkit/core@0.5.0
+
 ## 0.1.2
 
 ### Patch Changes
