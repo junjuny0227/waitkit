@@ -1,4 +1,11 @@
-export { resolveDelay, shouldTrigger, sleep } from './delay';
+export {
+  resolveDelay,
+  shouldTrigger,
+  sleep,
+  validateDelay,
+  validateRate,
+  validateTimeoutMs,
+} from './delay';
 export { WaitKitTimeoutError } from './errors';
 export { setupWaitKit } from './setup-wait-kit';
 export type {
