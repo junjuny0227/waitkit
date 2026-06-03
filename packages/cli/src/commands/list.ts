@@ -7,8 +7,7 @@ export async function runList(cwd = process.cwd()): Promise<void> {
   const config = await loadConfig(cwd);
 
   if (config === null) {
-    printError('waitkit.config.ts not found. Run `waitkit init` to create one.');
-    process.exit(1);
+    throw new Error('waitkit.config.ts not found. Run `waitkit init` to create one.');
   }
 
   const scenarioEntries = Object.entries(config.scenarios ?? {});
@@ -39,6 +38,11 @@ export function listCommand(): Command {
   return new Command('list')
     .description('List scenarios defined in waitkit.config.ts')
     .action(async () => {
-      await runList();
+      try {
+        await runList();
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
     });
 }

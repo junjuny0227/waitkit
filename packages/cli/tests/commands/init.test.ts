@@ -11,9 +11,7 @@ describe('runInit', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'waitkit-init-test-'));
-    vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -39,10 +37,10 @@ describe('runInit', () => {
     expect(content).toContain('timeout');
   });
 
-  it('exits with error when config already exists and --force is not set', () => {
+  it('throws when config already exists and --force is not set', () => {
     writeFileSync(join(tmpDir, 'waitkit.config.ts'), '// existing', 'utf-8');
 
-    expect(() => runInit({}, tmpDir)).toThrow('process.exit called');
+    expect(() => runInit({}, tmpDir)).toThrow('already exists');
   });
 
   it('overwrites existing config when --force is set', () => {

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createJiti } from 'jiti';
@@ -17,24 +18,18 @@ export async function loadConfig(cwd: string): Promise<WaitKitConfig | null> {
   for (const filename of CONFIG_FILENAMES) {
     const filePath = resolve(cwd, filename);
 
-    try {
-      const mod = (await jiti.import(filePath, { default: true })) as
-        | WaitKitConfig
-        | { default?: WaitKitConfig };
-
-      return 'default' in mod && mod.default !== undefined ? mod.default : (mod as WaitKitConfig);
-    } catch (err) {
-      if (isNotFoundError(err, filePath)) continue;
-      throw err;
+    if (!existsSync(filePath)) {
+      continue;
     }
+
+    const mod = (await jiti.import(filePath, { default: true })) as
+      | WaitKitConfig
+      | { default?: WaitKitConfig };
+
+    return mod != null && typeof mod === 'object' && 'default' in mod && mod.default !== undefined
+      ? mod.default
+      : (mod as WaitKitConfig);
   }
 
   return null;
-}
-
-function isNotFoundError(err: unknown, filePath: string): boolean {
-  if (!(err instanceof Error)) return false;
-  const code = (err as NodeJS.ErrnoException).code;
-  if (code === 'MODULE_NOT_FOUND' || code === 'ENOENT') return true;
-  return err.message.includes(filePath) && err.message.includes('Cannot find');
 }

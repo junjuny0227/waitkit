@@ -12,9 +12,6 @@ const mockLoadConfig = vi.mocked(loadConfig);
 
 describe('runList', () => {
   beforeEach(() => {
-    vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -23,10 +20,10 @@ describe('runList', () => {
     vi.restoreAllMocks();
   });
 
-  it('exits with error when config is not found', async () => {
+  it('throws when config is not found', async () => {
     mockLoadConfig.mockResolvedValue(null);
 
-    await expect(runList('/any')).rejects.toThrow('process.exit called');
+    await expect(runList('/any')).rejects.toThrow('waitkit.config.ts not found');
   });
 
   it('prints scenario names and rule counts', async () => {

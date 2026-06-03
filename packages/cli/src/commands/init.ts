@@ -28,8 +28,7 @@ export function runInit(options: { force?: boolean }, cwd = process.cwd()): void
   const configPath = resolve(cwd, CONFIG_FILENAME);
 
   if (existsSync(configPath) && !options.force) {
-    printError(`${CONFIG_FILENAME} already exists. Use --force to overwrite.`);
-    process.exit(1);
+    throw new Error(`${CONFIG_FILENAME} already exists. Use --force to overwrite.`);
   }
 
   writeFileSync(configPath, TEMPLATE, 'utf-8');
@@ -41,6 +40,11 @@ export function initCommand(): Command {
     .description('Create a waitkit.config.ts file with example scenarios')
     .option('--force', 'Overwrite existing config file')
     .action((options: { force?: boolean }) => {
-      runInit(options);
+      try {
+        runInit(options);
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
     });
 }

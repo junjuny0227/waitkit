@@ -12,9 +12,6 @@ const mockLoadConfig = vi.mocked(loadConfig);
 
 describe('runValidate', () => {
   beforeEach(() => {
-    vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -23,10 +20,10 @@ describe('runValidate', () => {
     vi.restoreAllMocks();
   });
 
-  it('exits with error when config is not found', async () => {
+  it('throws when config is not found', async () => {
     mockLoadConfig.mockResolvedValue(null);
 
-    await expect(runValidate('/any')).rejects.toThrow('process.exit called');
+    await expect(runValidate('/any')).rejects.toThrow('waitkit.config.ts not found');
   });
 
   it('succeeds with a valid config', async () => {
@@ -51,7 +48,7 @@ describe('runValidate', () => {
       scenarios: { bad: [{ url: '/api', errorRate: 2 }] },
     });
 
-    await expect(runValidate('/any')).rejects.toThrow('process.exit called');
+    await expect(runValidate('/any')).rejects.toThrow('1 error(s) found');
 
     const errOutput = vi
       .mocked(console.error)
@@ -65,7 +62,7 @@ describe('runValidate', () => {
       scenarios: { bad: [{ url: '/api', timeoutRate: -1 }] },
     });
 
-    await expect(runValidate('/any')).rejects.toThrow('process.exit called');
+    await expect(runValidate('/any')).rejects.toThrow('1 error(s) found');
 
     const errOutput = vi
       .mocked(console.error)
@@ -79,7 +76,7 @@ describe('runValidate', () => {
       rules: [{ url: '/api', delay: [500, 100] as unknown as [number, number] }],
     });
 
-    await expect(runValidate('/any')).rejects.toThrow('process.exit called');
+    await expect(runValidate('/any')).rejects.toThrow('1 error(s) found');
 
     const errOutput = vi
       .mocked(console.error)
@@ -93,7 +90,7 @@ describe('runValidate', () => {
       scenarios: { bad: [{ url: '/api', errorResponse: { status: 999 } }] },
     });
 
-    await expect(runValidate('/any')).rejects.toThrow('process.exit called');
+    await expect(runValidate('/any')).rejects.toThrow('1 error(s) found');
 
     const errOutput = vi
       .mocked(console.error)
@@ -108,7 +105,7 @@ describe('runValidate', () => {
       defaultScenario: 'ghost',
     });
 
-    await expect(runValidate('/any')).rejects.toThrow('process.exit called');
+    await expect(runValidate('/any')).rejects.toThrow('1 error(s) found');
 
     const errOutput = vi
       .mocked(console.error)

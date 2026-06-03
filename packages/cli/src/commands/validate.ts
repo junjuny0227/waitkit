@@ -10,8 +10,7 @@ export async function runValidate(cwd = process.cwd()): Promise<void> {
   const config = await loadConfig(cwd);
 
   if (config === null) {
-    printError('waitkit.config.ts not found. Run `waitkit init` to create one.');
-    process.exit(1);
+    throw new Error('waitkit.config.ts not found. Run `waitkit init` to create one.');
   }
 
   const errors = collectErrors(config);
@@ -21,8 +20,7 @@ export async function runValidate(cwd = process.cwd()): Promise<void> {
       printError(msg);
     }
     printLine('');
-    printError(`${errors.length} error(s) found`);
-    process.exit(1);
+    throw new Error(`${errors.length} error(s) found`);
   }
 
   const scenarioCount = Object.keys(config.scenarios ?? {}).length;
@@ -59,13 +57,24 @@ function collectErrors(config: WaitKitConfig): string[] {
 function validateRule(rule: WaitKitRule, path: string): string[] {
   const errors: string[] = [];
 
+  if (typeof (rule as unknown) !== 'object' || rule === null) {
+    errors.push(`${path}: rule must be an object`);
+    return errors;
+  }
+
   tryValidate(() => validateDelay(rule.delay), path, errors);
   tryValidate(() => validateRate(rule.errorRate, 'errorRate'), path, errors);
   tryValidate(() => validateRate(rule.timeoutRate, 'timeoutRate'), path, errors);
   tryValidate(() => validateTimeoutMs(rule.timeoutMs), path, errors);
 
-  const statusMsg = validateStatus(rule.errorResponse?.status);
-  if (statusMsg !== null) errors.push(`${path}: ${statusMsg}`);
+  if (rule.errorResponse !== undefined) {
+    if (typeof (rule.errorResponse as unknown) !== 'object' || rule.errorResponse === null) {
+      errors.push(`${path}: errorResponse must be an object`);
+    } else {
+      const statusMsg = validateStatus(rule.errorResponse.status);
+      if (statusMsg !== null) errors.push(`${path}: ${statusMsg}`);
+    }
+  }
 
   return errors;
 }
@@ -90,6 +99,11 @@ export function validateCommand(): Command {
   return new Command('validate')
     .description('Validate the waitkit.config.ts file')
     .action(async () => {
-      await runValidate();
+      try {
+        await runValidate();
+      } catch (err) {
+        printError(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
     });
 }
