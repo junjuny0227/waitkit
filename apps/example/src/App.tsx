@@ -1,17 +1,17 @@
 import { WaitKitDevTools, WaitKitProvider } from '@waitkit/react';
 
 import { PostsCard, TodosCard, UsersCard } from './components/ApiCard';
-import { controller, SCENARIO_NAMES } from './waitkit';
+import { controller } from './waitkit';
 
 export default function App() {
   return (
-    <WaitKitProvider controller={controller} scenarioNames={SCENARIO_NAMES}>
+    <WaitKitProvider controller={controller}>
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         <header className="border-b border-zinc-800 px-6 py-4">
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             <span className="text-lg font-bold tracking-tight">Waitkit</span>
-            <span className="text-zinc-600 text-sm">예제 앱</span>
-            <span className="ml-auto text-xs text-zinc-600">
+            <span className="text-zinc-600 text-sm whitespace-nowrap">예제 앱</span>
+            <span className="ml-auto hidden sm:inline text-xs text-zinc-600">
               DevTools 패널로 scenario를 바꿔보세요 →
             </span>
           </div>
@@ -22,7 +22,7 @@ export default function App() {
             <h1 className="text-xl font-semibold text-zinc-100">API 요청 시뮬레이션</h1>
             <p className="mt-1 text-sm text-zinc-500">
               우측 하단 패널에서 scenario를 선택하면 각 카드의 요청 상태가 바뀝니다. reload 버튼으로
-              재요청할 수 있습니다.
+              재요청할 수 있고, 대기 중에 reload하면 이전 요청은 abort됩니다.
             </p>
           </div>
 
@@ -39,18 +39,26 @@ export default function App() {
             <ul className="space-y-2 text-sm">
               <li className="flex gap-3">
                 <span className="text-zinc-300 font-mono w-32 shrink-0">slow-network</span>
-                <span className="text-zinc-500">모든 /api/ 요청에 2초 delay 적용</span>
+                <span className="text-zinc-500">모든 /api 요청에 1.5~2.5초 delay</span>
               </li>
               <li className="flex gap-3">
                 <span className="text-zinc-300 font-mono w-32 shrink-0">server-error</span>
-                <span className="text-zinc-500">모든 /api/ 요청에 500 에러 응답 반환</span>
+                <span className="text-zinc-500">모든 /api 요청에 500 에러 응답</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-zinc-300 font-mono w-32 shrink-0">flaky</span>
+                <span className="text-zinc-500">/api 요청의 절반을 503으로 실패</span>
               </li>
               <li className="flex gap-3">
                 <span className="text-zinc-300 font-mono w-32 shrink-0">timeout</span>
-                <span className="text-zinc-500">모든 /api/ 요청을 3초 후 timeout 처리</span>
+                <span className="text-zinc-500">모든 /api 요청을 3초 뒤 timeout 처리</span>
               </li>
               <li className="flex gap-3">
-                <span className="text-zinc-500 font-mono w-32 shrink-0">(없음)</span>
+                <span className="text-zinc-300 font-mono w-32 shrink-0">slow-users</span>
+                <span className="text-zinc-500">/api/users만 3초 delay (나머지는 그대로)</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-zinc-500 font-mono w-32 shrink-0">base</span>
                 <span className="text-zinc-500">실제 JSONPlaceholder API 요청 통과</span>
               </li>
             </ul>
