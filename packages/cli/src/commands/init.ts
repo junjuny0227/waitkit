@@ -1,50 +1,37 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Command } from 'commander';
+import type { Output } from '../output';
 
-import { printError, printSuccess } from '../utils/output.js';
-
-const CONFIG_FILENAME = 'waitkit.config.ts';
-
-const TEMPLATE = `import { defineConfig } from '@waitkit/cli';
+const TS_TEMPLATE = `import { defineConfig } from '@waitkit/core';
 
 export default defineConfig({
+  // Used while no scenario is active. Empty means every request goes to the network.
+  rules: [],
   scenarios: {
-    'slow-network': [{ url: /\\/api\\//, delay: 2000 }],
-    'server-error': [
-      {
-        url: /\\/api\\//,
-        errorRate: 1,
-        errorResponse: { status: 500, body: { message: 'Internal Server Error' } },
-      },
-    ],
-    timeout: [{ url: /\\/api\\//, timeoutRate: 1, timeoutMs: 3000 }],
+    'slow-network': [{ url: '/api/*', delay: [800, 2000] }],
+    'server-error': [{ url: '/api/*', error: { status: 500, body: { message: 'Internal Server Error' } } }],
+    flaky: [{ url: '/api/*', error: { rate: 0.3, status: 503 } }],
+    timeout: [{ url: '/api/*', timeout: { ms: 5000 } }],
   },
 });
 `;
 
-export function runInit(options: { force?: boolean }, cwd = process.cwd()): void {
-  const configPath = resolve(cwd, CONFIG_FILENAME);
-
-  if (existsSync(configPath) && !options.force) {
-    throw new Error(`${CONFIG_FILENAME} already exists. Use --force to overwrite.`);
-  }
-
-  writeFileSync(configPath, TEMPLATE, 'utf-8');
-  printSuccess(`Created ${CONFIG_FILENAME}`);
+export interface InitOptions {
+  force?: boolean;
+  file?: string;
 }
 
-export function initCommand(): Command {
-  return new Command('init')
-    .description('Create a waitkit.config.ts file with example scenarios')
-    .option('--force', 'Overwrite existing config file')
-    .action((options: { force?: boolean }) => {
-      try {
-        runInit(options);
-      } catch (err) {
-        printError(err instanceof Error ? err.message : String(err));
-        process.exit(1);
-      }
-    });
+/** Writes a starter config. Returns the process exit code. */
+export function runInit(options: InitOptions, cwd: string, output: Output): number {
+  const path = resolve(cwd, options.file ?? 'waitkit.config.ts');
+
+  if (existsSync(path) && options.force !== true) {
+    output.error(`✗ ${path} already exists. Use --force to overwrite it.`);
+    return 1;
+  }
+
+  writeFileSync(path, TS_TEMPLATE, 'utf-8');
+  output.log(`✓ Created ${path}`);
+  return 0;
 }

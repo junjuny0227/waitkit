@@ -1,69 +1,57 @@
 {
   "name": "@waitkit/cli",
   "version": "0.1.0",
-  "description": "CLI for managing Waitkit network simulation configurations.",
-  "type": "module",
-  "license": "MIT",
-  "author": "junjuny0227",
-  "homepage": "https://github.com/junjuny0227/waitkit#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/junjuny0227/waitkit.git"
-  },
+  "description": "Command line tool to create, list, and validate waitkit.config files.",
+  "keywords": [
+    "cli",
+    "config",
+    "network",
+    "simulation",
+    "waitkit"
+  ],
+  "homepage": "https://github.com/junjuny0227/waitkit/tree/main/packages/cli#readme",
   "bugs": {
     "url": "https://github.com/junjuny0227/waitkit/issues"
   },
-  "keywords": [
-    "cli",
-    "waitkit",
-    "network",
-    "simulation",
-    "development"
-  ],
+  "license": "Apache-2.0",
+  "author": "junjuny0227",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/junjuny0227/waitkit.git",
+    "directory": "packages/cli"
+  },
   "bin": {
-    "waitkit": "./dist/cli.cjs"
+    "waitkit": "./dist/cli.mjs"
   },
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    }
-  },
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "README.md"
+    "LICENSE",
+    "NOTICE"
   ],
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "dev": "tsup --watch",
-    "build": "tsup",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc"
   },
   "dependencies": {
-    "@waitkit/core": "workspace:*",
-    "commander": "^12.0.0",
-    "jiti": "^2.0.0"
+    "@waitkit/core": "workspace:^",
+    "commander": "^15.1.0",
+    "jiti": "^2.7.0"
   },
   "devDependencies": {
-    "@waitkit/eslint-config": "workspace:*",
+    "@types/node": "catalog:",
     "@waitkit/typescript-config": "workspace:*",
-    "eslint": "^9.39.4",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.6"
+    "publint": "^0.3.25",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }
