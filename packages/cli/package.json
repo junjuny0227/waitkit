@@ -45,7 +45,6 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@waitkit/typescript-config": "workspace:*",
     "publint": "^0.3.25",
     "tsdown": "catalog:",
     "typescript": "catalog:",

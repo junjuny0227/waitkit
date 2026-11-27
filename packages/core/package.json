@@ -51,7 +51,6 @@
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
-    "@waitkit/typescript-config": "workspace:*",
     "publint": "^0.3.25",
     "tsdown": "catalog:",
     "typescript": "catalog:",

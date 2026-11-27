@@ -1,4 +1,4 @@
 {
-  "extends": "@waitkit/typescript-config/base.json",
+  "extends": "../../tsconfig.base.json",
   "include": ["src", "tests", "*.config.ts"]
 }

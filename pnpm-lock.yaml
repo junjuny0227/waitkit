@@ -270,9 +270,6 @@ importers:
       '@waitkit/cli':
         specifier: workspace:*
         version: link:../../packages/cli
-      '@waitkit/typescript-config':
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
       babel-plugin-react-compiler:
         specifier: ^1.0.0
         version: 1.0.0
@@ -301,9 +298,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.7
-      '@waitkit/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
       publint:
         specifier: ^0.3.25
         version: 0.3.25
@@ -322,9 +316,6 @@ importers:
       '@arethetypeswrong/core':
         specifier: ^0.18.5
         version: 0.18.5
-      '@waitkit/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
       publint:
         specifier: ^0.3.25
         version: 0.3.25
@@ -347,9 +338,6 @@ importers:
       '@arethetypeswrong/core':
         specifier: ^0.18.5
         version: 0.18.5
-      '@waitkit/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
       msw:
         specifier: ^3.0.8
         version: 3.0.8(@types/node@24.12.4)(graphql@16.14.0)(supports-color@7.2.0)(typescript@7.0.2)(vite@8.4.0(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))
@@ -387,9 +375,6 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.3)
-      '@waitkit/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
       jsdom:
         specifier: ^31.0.1
         version: 31.0.1
@@ -411,8 +396,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.1.2(@types/node@24.12.4)(jsdom@31.0.1)(msw@3.0.8(@types/node@24.12.4)(graphql@16.14.0)(supports-color@7.2.0)(typescript@7.0.2)(vite@8.4.0(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1)))(vite@8.4.0(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1))
-
-  packages/typescript-config: {}
 
 packages:
 
