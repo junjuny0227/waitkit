@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, within } from '@testing-library/react';
 import { setupWaitKit, type WaitKitConfig, type WaitKitController } from '@waitkit/core';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +24,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   controller.dispose();
   globalThis.fetch = realFetch;
   vi.useRealTimers();
@@ -94,28 +95,61 @@ describe('useWaitKitEvent', () => {
   });
 });
 
+/** The panel renders into a shadow root; query inside it like a user would see it. */
+function panel() {
+  const host = document.querySelector('waitkit-devtools');
+  if (host?.shadowRoot == null) throw new Error('devtools host not mounted');
+  return within(host.shadowRoot as unknown as HTMLElement);
+}
+
+const rows = () => panel().queryAllByRole('listitem');
+
 describe('WaitKitDevTools', () => {
-  it('toggles enabled state', () => {
+  it('renders into a shadow root attached to the body and removes it on unmount', () => {
+    const { unmount } = render(<WaitKitDevTools />, { wrapper });
+
+    const host = document.querySelector('waitkit-devtools');
+    expect(host?.parentElement).toBe(document.body);
+    expect(host?.shadowRoot?.querySelector('style')?.textContent).toContain('--wk-surface');
+    expect(panel().getByRole('complementary', { name: 'Waitkit devtools' })).toBeTruthy();
+
+    unmount();
+    expect(document.querySelector('waitkit-devtools')).toBeNull();
+  });
+
+  it('switches simulation on and off and explains the off state', () => {
     render(<WaitKitDevTools />, { wrapper });
+    const toggle = panel().getByRole('switch', { name: 'Simulate' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Off' }));
+    fireEvent.click(toggle);
     expect(controller.getState().enabled).toBe(false);
-    expect(screen.getByRole('button', { name: 'Off' }).getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    expect(
+      panel().getByText('Simulation is off. Requests go straight to the network.'),
+    ).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'On' }));
+    fireEvent.click(toggle);
     expect(controller.getState().enabled).toBe(true);
+    expect(panel().queryByText(/Simulation is off/)).toBeNull();
   });
 
   it('switches scenarios and back to the base rules', () => {
     render(<WaitKitDevTools />, { wrapper });
+    const group = within(panel().getByRole('group', { name: 'Scenario' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'broken' }));
+    expect(group.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'base',
+      'slow',
+      'broken',
+      'hang',
+    ]);
+
+    fireEvent.click(group.getByRole('button', { name: 'broken' }));
     expect(controller.getState().scenario).toBe('broken');
-    expect(screen.getByRole('button', { name: 'broken' }).getAttribute('aria-pressed')).toBe(
-      'true',
-    );
+    expect(group.getByRole('button', { name: 'broken' }).getAttribute('aria-pressed')).toBe('true');
 
-    fireEvent.click(screen.getByRole('button', { name: 'base' }));
+    fireEvent.click(group.getByRole('button', { name: 'base' }));
     expect(controller.getState().scenario).toBeUndefined();
   });
 
@@ -124,38 +158,67 @@ describe('WaitKitDevTools', () => {
 
     act(() => controller.setScenario('slow'));
 
-    expect(screen.getByRole('button', { name: 'slow' }).getAttribute('aria-pressed')).toBe('true');
+    expect(panel().getByRole('button', { name: 'slow' }).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('logs simulated requests with their outcome, newest first, and can clear them', async () => {
+  it('shows waiting requests with remaining time, then how each one ended', async () => {
     vi.useFakeTimers();
     render(<WaitKitDevTools />, { wrapper });
-    expect(screen.getByText('no simulated requests yet')).toBeTruthy();
+    expect(panel().getByText(/No simulated requests yet/)).toBeTruthy();
 
-    act(() => controller.setScenario('broken'));
-    await act(() => fetch('/api/users'));
     act(() => controller.setScenario('slow'));
+    let pending!: Promise<Response>;
+    act(() => {
+      pending = fetch('/api/posts?page=2', { method: 'POST' });
+    });
+
+    expect(rows().map((row) => row.textContent)).toEqual(['POST/api/posts?page=2waiting 100ms']);
+    expect(panel().getByText('Activity · 1 waiting')).toBeTruthy();
+
     await act(async () => {
-      const pending = fetch('/api/posts', { method: 'POST' });
       await vi.advanceTimersByTimeAsync(100);
       await pending;
     });
+    expect(rows().map((row) => row.textContent)).toEqual(['POST/api/posts?page=2+100ms']);
+
+    act(() => controller.setScenario('broken'));
+    await act(() => fetch('/api/users'));
+
     act(() => controller.setScenario('hang'));
+    let hanging!: Promise<unknown>;
+    act(() => {
+      hanging = fetch('/api/hang').catch(() => undefined);
+    });
+    expect(rows()[0]?.textContent).toBe('GET/api/hanghanging 50ms');
     await act(async () => {
-      const pending = fetch('/api/hang').catch(() => undefined);
       await vi.advanceTimersByTimeAsync(50);
+      await hanging;
+    });
+
+    expect(rows().map((row) => row.textContent)).toEqual([
+      'GET/api/hangtimeout 50ms',
+      'GET/api/users503',
+      'POST/api/posts?page=2+100ms',
+    ]);
+    expect(rows()[0]?.title).toBe('http://localhost:3000/api/hang');
+
+    fireEvent.click(panel().getByRole('button', { name: 'Clear' }));
+    expect(rows()).toHaveLength(0);
+  });
+
+  it('marks requests aborted while waiting', async () => {
+    vi.useFakeTimers();
+    render(<WaitKitDevTools />, { wrapper });
+    act(() => controller.setScenario('slow'));
+    const abort = new AbortController();
+
+    await act(async () => {
+      const pending = fetch('/api/slow', { signal: abort.signal }).catch(() => undefined);
+      abort.abort();
       await pending;
     });
 
-    const entries = screen.getAllByRole('listitem').map((item) => item.textContent);
-    expect(entries).toEqual([
-      'timeout 50ms GET http://localhost:3000/api/hang',
-      'delay POST http://localhost:3000/api/posts +100ms',
-      'error 503 GET http://localhost:3000/api/users',
-    ]);
-
-    fireEvent.click(screen.getByRole('button', { name: 'clear' }));
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(rows()[0]?.textContent).toBe('GET/api/slowaborted');
   });
 
   it('keeps at most maxLogEntries entries', async () => {
@@ -166,29 +229,56 @@ describe('WaitKitDevTools', () => {
       await act(() => fetch(path));
     }
 
-    expect(screen.getAllByRole('listitem').map((item) => item.title)).toEqual([
+    expect(rows().map((row) => row.title)).toEqual([
       'http://localhost:3000/api/3',
       'http://localhost:3000/api/2',
     ]);
   });
 
-  it('collapses and expands the panel', () => {
-    render(<WaitKitDevTools defaultOpen={false} />, { wrapper });
-    const header = screen.getByRole('button', { name: /Waitkit/ });
+  it('collapses to a launcher that shows state and remembers it', () => {
+    const { unmount } = render(<WaitKitDevTools />, { wrapper });
 
-    expect(header.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('button', { name: 'On' })).toBeNull();
+    fireEvent.click(panel().getByRole('button', { name: 'Collapse Waitkit devtools' }));
+    act(() => controller.setScenario('broken'));
+    const launcher = panel().getByRole('button', { name: /Open Waitkit devtools/ });
 
-    fireEvent.click(header);
-    expect(screen.getByRole('button', { name: 'On' })).toBeTruthy();
+    expect(launcher.getAttribute('aria-label')).toBe('Open Waitkit devtools (on, scenario broken)');
+    expect(panel().queryByRole('switch')).toBeNull();
+    unmount();
+
+    render(<WaitKitDevTools />, { wrapper });
+    expect(panel().getByRole('button', { name: /Open Waitkit devtools/ })).toBeTruthy();
+
+    fireEvent.click(panel().getByRole('button', { name: /Open Waitkit devtools/ }));
+    expect(panel().getByRole('switch', { name: 'Simulate' })).toBeTruthy();
+  });
+
+  it('toggles with the keyboard shortcut', () => {
+    render(<WaitKitDevTools shortcut="alt+shift+w" />, { wrapper });
+
+    fireEvent.keyDown(window, { code: 'KeyW', altKey: true, shiftKey: true });
+    expect(panel().getByRole('button', { name: /Open Waitkit devtools/ })).toBeTruthy();
+
+    fireEvent.keyDown(window, { code: 'KeyW', altKey: true });
+    expect(panel().queryByRole('switch')).toBeNull();
+
+    fireEvent.keyDown(window, { code: 'KeyW', altKey: true, shiftKey: true });
+    expect(panel().getByRole('switch')).toBeTruthy();
+  });
+
+  it('applies the chosen theme and position', () => {
+    render(<WaitKitDevTools theme="light" position="top-left" />, { wrapper });
+    const aside = panel().getByRole('complementary');
+
+    expect(aside.dataset.theme).toBe('light');
+    expect(aside.dataset.position).toBe('top-left');
   });
 
   it('renders nothing once the controller is disposed', () => {
     render(<WaitKitDevTools />, { wrapper });
-    expect(screen.getByRole('complementary', { name: 'Waitkit devtools' })).toBeTruthy();
 
     act(() => controller.dispose());
 
-    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(document.querySelector('waitkit-devtools')).toBeNull();
   });
 });

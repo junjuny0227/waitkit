@@ -99,14 +99,14 @@ controller.on('match', (event) => console.log(event.url));
 
 ## `@waitkit/react`
 
-| 0.x                                                           | 1.0                                                                      |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `<WaitKitProvider scenarioNames={...}>`                       | `<WaitKitProvider controller={...}>` (names come from the controller)    |
-| `useWaitKitScenario()`                                        | `useWaitKit()` (`scenario`, `scenarios`, `setScenario`, `resetScenario`) |
-| `useWaitKit().restore`                                        | removed; call `controller.dispose()`                                     |
-| `useWaitKit().scenarioNames`                                  | `useWaitKit().scenarios`                                                 |
-| —                                                             | `useWaitKitEvent(type, listener)`, `useWaitKitController()`              |
-| DevTools buttons `Enabled` / `Disabled` / `Restore` / `reset` | `On` / `Off` / `base`                                                    |
+| 0.x                                                           | 1.0                                                                               |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `<WaitKitProvider scenarioNames={...}>`                       | `<WaitKitProvider controller={...}>` (names come from the controller)             |
+| `useWaitKitScenario()`                                        | `useWaitKit()` (`scenario`, `scenarios`, `setScenario`, `resetScenario`)          |
+| `useWaitKit().restore`                                        | removed; call `controller.dispose()`                                              |
+| `useWaitKit().scenarioNames`                                  | `useWaitKit().scenarios`                                                          |
+| —                                                             | `useWaitKitEvent(type, listener)`, `useWaitKitController()`                       |
+| DevTools buttons `Enabled` / `Disabled` / `Restore` / `reset` | `Simulate` switch / scenario chips with `base`; the panel collapses to a launcher |
 
 `useWaitKit` now follows changes made directly on the controller.
 
