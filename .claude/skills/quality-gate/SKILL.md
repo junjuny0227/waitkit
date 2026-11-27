@@ -1,49 +1,43 @@
 ---
 name: quality-gate
-description: 'Verify Waitkit changes with Prettier checks, pnpm lint, pnpm check-types, pnpm test, pnpm build, package output review, public API checks, docs alignment, and release readiness.'
+description: 'Run the Waitkit gate (format, lint, types, build with publint/attw, tests) and report results honestly. Use before saying any change is done.'
+allowed-tools: Bash(pnpm check), Bash(pnpm format*), Bash(pnpm lint*), Bash(pnpm check-types), Bash(pnpm build), Bash(pnpm test), Bash(pnpm --filter *), Read
 ---
 
-# Waitkit Quality Gate
+# Waitkit quality gate
 
-Use this skill to verify changes before final delivery.
-
-## Rule Loading
-
-Discover and read relevant project harness rules:
+## Run
 
 ```bash
-find .claude/rules -name "*.md" 2>/dev/null
+export TURBO_UI=stream
+pnpm check
 ```
 
-Use these files together with `CLAUDE.md`, `AGENTS.md`, and nearby source
-patterns.
-
-## Minimum Commands
-
-Run these when feasible:
+`pnpm check` runs format:check → lint → check-types → build → test and stops at the first
+failure. To find every failing stage at once, run them separately:
 
 ```bash
-pnpm exec prettier --check .
-pnpm lint
-pnpm check-types
-pnpm test
-pnpm build
+pnpm format:check; pnpm lint; pnpm check-types; pnpm build; pnpm test
 ```
 
-If a command fails, inspect whether the failure is caused by the current change,
-the environment, or pre-existing repository state.
+Fix formatting with `pnpm format` and auto-fixable lint with `pnpm lint:fix`.
 
-## Static Review Checklist
+## Classify failures
 
-- Public exports match intended API.
-- Package `exports`, `main`, `module`, `types`, and built files agree.
-- Core behavior has focused tests.
-- Global fetch patching and restore behavior remain safe.
-- README examples match real exports.
-- Changesets match npm-visible behavior.
-- No generated `dist/` files were edited by hand.
+- **Caused by the change**: fix it.
+- **Stale core build** ("has no exported member" in react/msw/cli): run
+  `pnpm --filter @waitkit/core build`, then retry.
+- **publint error in build**: a manifest path does not match the file tsdown emitted.
+- **Environment**: missing Node 22.18+, or pnpm not matching `packageManager`. Report it; do not
+  work around it in code.
 
-## Reporting Format
+## Static checks the commands do not cover
 
-Report findings in this order: blocking issues, non-blocking risks, commands
-run, and residual risk. If no issues are found, say so directly.
+- Public exports changed → package README and, if breaking, `docs/migration-*.md` updated.
+- npm-visible change → changeset present with the right bump.
+- No edits under `dist/` and no duplicated core logic in react, msw, or cli.
+
+## Report
+
+Blocking issues first, then non-blocking risks, then the commands run with their exit codes,
+then anything not run and why. Never report a command as passing without having run it.

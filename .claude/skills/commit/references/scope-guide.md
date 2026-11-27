@@ -1,26 +1,18 @@
-# Waitkit Git Scope Guide
+# Waitkit commit scopes
 
-Choose the smallest useful commit scope.
+| Changed area                                                                                              | Scope     |
+| --------------------------------------------------------------------------------------------------------- | --------- |
+| `packages/core/**`                                                                                        | `core`    |
+| `packages/react/**`                                                                                       | `react`   |
+| `packages/msw/**`                                                                                         | `msw`     |
+| `packages/cli/**`                                                                                         | `cli`     |
+| `apps/example/**`                                                                                         | `example` |
+| `README.md`, `docs/**`, package `README.md` only                                                          | `docs`    |
+| `.changeset/**`, `CHANGELOG.md`, version bumps                                                            | `release` |
+| `package.json`, `pnpm-*.yaml`, `turbo.json`, `.ox*rc.json`, `packages/typescript-config/**`, `.vscode/**` | `tooling` |
+| `.github/**`                                                                                              | `ci`      |
+| `AGENTS.md`, `CLAUDE.md`, `.claude/**`                                                                    | `harness` |
+| `ROADMAP.md`                                                                                              | `roadmap` |
 
-## Common Scopes
-
-| Changed area                                  | Scope      |
-| --------------------------------------------- | ---------- |
-| `packages/core/src`, `packages/core/tests`    | `core`     |
-| `packages/core/README.md`, root `README.md`   | `docs`     |
-| `.changeset`, `CHANGELOG.md`, package version | `release`  |
-| `packages/eslint-config`                      | `eslint`   |
-| `packages/typescript-config`                  | `tsconfig` |
-| `package.json`, `turbo.json`, workspace files | `tooling`  |
-| `.claude/**`, `CLAUDE.md`                     | `harness`  |
-| `AGENTS.md`                                   | `agents`   |
-| `ROADMAP.md`                                  | `roadmap`  |
-
-## Commit Types
-
-- `feat`: new package behavior or public capability.
-- `fix`: bug fix.
-- `docs`: documentation-only change.
-- `test`: test-only change.
-- `refactor`: behavior-preserving code restructuring.
-- `chore`: tooling, release, harness, or maintenance change.
+Types: `feat` new capability, `fix` bug fix, `docs` docs only, `test` tests only, `refactor`
+behavior-preserving restructuring, `chore` tooling, release, or harness, `ci` workflows.

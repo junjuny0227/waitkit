@@ -1,30 +1,29 @@
 ---
 name: release-docs
-description: 'Maintain Waitkit README files, ROADMAP, Changesets, changelogs, package metadata, install docs, release notes, and npm publish preparation. Use for documentation or release workflow tasks.'
+description: 'Prepare Waitkit release material: changesets, package READMEs, migration guide rows, ROADMAP, and release readiness. Never publishes.'
 ---
 
-# Waitkit Release Docs
+# Waitkit release docs
 
-Use this skill when docs, package metadata, or release workflow may change.
+Follow `.claude/rules/release-workflow.md`. This skill adds the steps.
 
-## Documentation Rules
+## Changeset
 
-- Root README stays concise: project purpose, packages, planned packages.
-- Package README explains install, usage, APIs, and production-safety guidance.
-- Keep examples aligned with real exports and current TypeScript behavior.
-- Prefer English for npm-facing docs unless the user asks otherwise.
+1. List the packages whose npm-visible behavior or docs changed.
+2. Choose the bump per package: `patch`, `minor`, or `major`.
+3. Write `.changeset/<kebab-name>.md` in English: one summary sentence, then bullets a user can
+   act on. `pnpm changeset status` must list the expected bumps.
 
-## Changesets Rules
+## Docs
 
-- Use `pnpm changeset` for package behavior changes that should be published.
-- Use `patch` for fixes and npm-visible docs updates.
-- Use `minor` for new backwards-compatible package capability before 1.0.
-- Do not use `major` before the public API is intentionally stable.
-- Docs-only GitHub changes do not need a changeset unless npm package docs must
-  update.
+- Package README: install, minimal usage, every public option, behavior notes. Examples must
+  use real exports; run `pnpm check-types` after editing code samples copied into tests or apps.
+- Breaking change: add a row to `docs/migration-<major>.md` with old code, new code, and how to
+  keep the old behavior if possible.
+- `ROADMAP.md` (Korean): move shipped items to the completed section.
 
-## Release Preparation
+## Release readiness
 
-Before release, verify package version, changelog, README, package exports,
-build output, and npm scope permissions. Never run `pnpm release` unless the
-user explicitly asks to publish.
+`pnpm check` passes, `pnpm changeset status` shows the intended bumps, `LICENSE`/`NOTICE` copies
+in each package match the root. Stop there: versioning (`pnpm changeset:version`) and publishing
+(`pnpm release`) run only on the user's request.

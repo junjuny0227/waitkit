@@ -1,36 +1,41 @@
 ---
-description: 'Package boundary, public export, TypeScript config, and monorepo architecture rules for Waitkit packages.'
+description: 'Package boundaries, public exports, manifests, and build config for Waitkit packages.'
 paths:
   - 'packages/**/package.json'
   - 'packages/**/src/**/*'
   - 'packages/**/tsconfig.json'
-  - 'packages/**/tsup.config.ts'
+  - 'packages/**/tsdown.config.ts'
   - 'pnpm-workspace.yaml'
   - 'turbo.json'
 ---
 
-# Package Architecture Rules
+# Package architecture
 
-Use these rules for package structure and public API changes.
+## Dependency direction
 
-## Boundaries
+```text
+@waitkit/core  ←  @waitkit/react
+               ←  @waitkit/msw   (+ msw types only)
+               ←  @waitkit/cli   (+ commander, jiti)
+```
 
-- Keep `@waitkit/core` framework-agnostic.
-- Do not introduce React, MSW, or CLI dependencies into core.
-- Shared tooling belongs in `packages/eslint-config` and
-  `packages/typescript-config`.
-- Generated `dist/` output is build output, not source.
+- `core` depends on nothing at runtime. Adapters depend on `core` with `workspace:^`.
+- An adapter needing a new default, validation, or decision gets it from a new `core` export,
+  never from its own copy. If `core` lacks the hook, add it to `core` first.
+- `msw` imports MSW only with `import type` from the `msw` root, which exists in MSW 2 and 3.
+  `tests/msw2-compat.test.ts` type-checks against MSW 2 through the `msw2` alias; keep it passing.
 
 ## Public API
 
-- Export consumer-facing APIs from `packages/core/src/index.ts`.
-- Keep package `exports`, `main`, `module`, and `types` aligned with build
-  output.
-- Preserve ESM/CJS compatibility unless the release plan says otherwise.
-- Update README examples when exported APIs change.
+- Each package exports only from `src/index.ts`. Anything exported there is public and needs
+  README coverage.
+- Exported functions carry explicit return types (`isolatedDeclarations`).
+- Manifests: `type: module`, `sideEffects: false` for libraries, `exports` with `import`
+  (`./dist/index.js`) and `require` (`./dist/index.cjs`), `types` → `./dist/index.d.cts`,
+  `files: ["dist", "LICENSE", "NOTICE"]`, `engines.node >=22.18.0`.
+- Libraries ship ESM and CJS; the CLI ships ESM only.
 
-## Change Scope
+## Shared versions
 
-- Make the smallest package change that satisfies the request.
-- Add abstractions only when they remove current duplication or clarify a public
-  contract.
+Tool versions used by several packages (`typescript`, `tsdown`, `vitest`, `react`, type
+packages) come from the `catalog:` in `pnpm-workspace.yaml`. Bump them there, not per package.

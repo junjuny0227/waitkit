@@ -1,64 +1,43 @@
 ---
 name: code-review
-description: 'Review Waitkit changed files using .claude/rules, package boundaries, public API contracts, core behavior, tests, docs, Changesets, release workflow, security basics, and validation results.'
+description: 'Review a Waitkit diff against AGENTS.md and .claude/rules: package boundaries, the core behavior contract, tests, docs, and release notes. Findings first.'
 ---
 
-# Waitkit Code Review
+# Waitkit code review
 
-Use this skill for structured review of changed Waitkit code, docs, release
-workflow, or harness files.
+## Scope
 
-## Step 1: Load Rules
+- Staged: `git diff --staged`. Working tree: `git diff`. Branch: `git diff origin/main...HEAD`.
+- Read `AGENTS.md` and the `.claude/rules/*.md` files whose `paths` match the diff. When they
+  conflict: `AGENTS.md` > `CLAUDE.md` > `.claude/rules` > nearby code.
 
-Discover rules dynamically:
+## What to look for, in priority order
 
-```bash
-find .claude/rules -name "*.md" 2>/dev/null
-```
+1. **Behavior contract** (`core-api-conventions.md`): defaults, effect order, matching, abort,
+   `dispose`, state identity, event emission. Any change here is breaking unless additive.
+2. **Boundaries** (`package-architecture.md`): logic copied out of core into an adapter, runtime
+   imports added to core, MSW imported for values instead of types.
+3. **Tests**: each behavior change has a focused test; randomness uses the `random` option;
+   timers are faked; fetch is restored.
+4. **Public surface**: `src/index.ts` exports, explicit return types, README examples that
+   compile, migration guide rows for breaking changes, changeset bump level.
+5. **Global state and leaks**: listeners removed, timers cleared on abort, no secrets or
+   generated files committed.
 
-Read relevant returned files. Rules in `CLAUDE.md` and `AGENTS.md` still apply.
-If rules conflict, use this priority:
-
-```text
-AGENTS.md > CLAUDE.md > .claude/rules/** > nearby source patterns
-```
-
-For multi-file reviews or pre-PR checks, also read
-`${CLAUDE_SKILL_DIR}/references/review-checklist.md`.
-
-## Step 2: Determine Review Scope
-
-- Staged review: `git diff --staged`
-- Working tree review: `git diff`
-- Branch review: compare with the base branch when available
-- File-specific review: inspect named files and direct dependencies
-
-## Step 3: Review Checklist
-
-- Package boundaries and public exports.
-- Type declarations and ESM/CJS package metadata.
-- Core fetch interception, matching, delay, error, timeout, and restore behavior.
-- Tests for changed behavior.
-- README, changelog, and changeset alignment.
-- Generated output or secret leakage.
-- Validation commands and unverified risk.
-
-## Report Format
-
-Lead with findings:
+## Report
 
 ```markdown
 ## Findings
 
-- [High|Medium|Low] `path:line` — issue, impact, and suggested fix.
+- [High|Medium|Low] `path:line` — problem, impact, suggested fix.
 
-## Open Questions
+## Open questions
 
-- Only include real blockers or assumptions.
+- Only real blockers or assumptions.
 
 ## Checks
 
-- Commands and static checks performed.
+- Commands run and their results; what was not run.
 ```
 
-If no issues are found, state that clearly and mention remaining test gaps.
+If there are no findings, say so and name the remaining test gaps.

@@ -1,39 +1,24 @@
 ---
-description: 'Changesets, changelog, package metadata, npm publish, README, and release workflow rules for Waitkit.'
+description: 'Changesets, versions, package READMEs, migration notes, and publishing for Waitkit.'
 paths:
   - '.changeset/**/*'
   - 'packages/**/CHANGELOG.md'
   - 'packages/**/package.json'
-  - 'README.md'
   - 'packages/**/README.md'
+  - 'README.md'
   - 'ROADMAP.md'
+  - 'docs/**/*'
 ---
 
-# Release Workflow Rules
+# Release workflow
 
-Use these rules for documentation and release work.
-
-## Changesets
-
-- Add a changeset for package behavior changes intended for npm.
-- Do not add a changeset for repository-only docs unless npm docs should update.
-- Use `minor` for new backwards-compatible capabilities while packages are
-  pre-1.0.
-- Use `patch` for fixes and small npm-visible documentation updates.
-
-## Release Checks
-
-Before publishing, run or request:
-
-```bash
-pnpm lint
-pnpm check-types
-pnpm test
-pnpm build
-pnpm exec prettier --check .
-```
-
-## Publishing
-
-Do not publish unless the user explicitly asks. Confirm npm scope permission
-issues separately from code issues.
+- npm-visible change → `.changeset/<name>.md`. `patch` = fix or doc fix, `minor` = new
+  backwards-compatible feature, `major` = breaking. Repo-only docs, CI, and tooling need none.
+- Breaking changes also get a row in the current migration guide under `docs/`.
+- `pnpm changeset:version` updates versions and changelogs, then formats them. Do not edit
+  `CHANGELOG.md` or versions by hand.
+- Package READMEs are the npm page: examples must use real exports and compile against the
+  current API. Root `README.md` stays an overview with links.
+- Publishing (`pnpm release`, `changeset publish`, `npm publish`) happens only when the user asks,
+  and the pre-tool hook blocks it for agents. Check npm scope permissions separately from code
+  problems if publishing fails.

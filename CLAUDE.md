@@ -1,63 +1,22 @@
-# Waitkit
+# CLAUDE.md
 
-## Project Overview
+@AGENTS.md
 
-Waitkit is a pnpm/Turborepo monorepo for development-only network simulation
-tools. It helps frontend developers intentionally test loading, skeleton, error,
-timeout, and retry states.
+## Claude Code harness
 
-## Tech Stack
+Repository-wide instructions live in `AGENTS.md` (imported above) so every agent reads the same
+text. This section only covers what is specific to Claude Code.
 
-- Package manager: pnpm
-- Build system: Turborepo
-- Language: TypeScript
-- Core package build: tsup
-- Tests: Vitest
-- Lint/format: ESLint and Prettier
-- Release: Changesets
-
-## Project Structure
-
-- `packages/core`: publishable `@waitkit/core` package.
-- `packages/core/src`: fetch interception, rule matching, response simulation,
-  delay, errors, controller API, and public exports.
-- `packages/core/tests`: Vitest coverage for core behavior.
-- `packages/react`: publishable `@waitkit/react` package.
-- `packages/react/src`: WaitKitProvider, useWaitKit, useWaitKitScenario hooks,
-  WaitKitDevTools floating panel, and React store.
-- `packages/react/tests`: Vitest coverage for React integration.
-- `packages/msw`: publishable `@waitkit/msw` package.
-- `packages/msw/src`: withWaitKit HOF for MSW v2 resolver integration.
-- `packages/msw/tests`: Vitest coverage for MSW integration.
-- `packages/eslint-config`: shared ESLint config.
-- `packages/typescript-config`: shared TypeScript config.
-- `apps/example`: Vite + React example app demonstrating core and react packages.
-- `.changeset`: pending release notes.
-- `ROADMAP.md`: future development plan.
-
-Generated `dist/` output should not be edited directly.
-
-## Commands
-
-- `pnpm lint`: run ESLint through Turbo.
-- `pnpm check-types`: run TypeScript checks.
-- `pnpm test`: run Vitest tests.
-- `pnpm build`: build packages.
-- `pnpm exec prettier --check .`: check formatting.
-- `pnpm changeset`: create a release note.
-- `pnpm changeset:version`: apply changesets to versions/changelogs.
-- `pnpm release`: build and publish changed packages.
-
-## Harness: Waitkit Library
-
-**Goal:** Coordinate focused Waitkit library work through reusable agents,
-skills, and rules for package architecture, core implementation, debugging,
-quality gates, code review, documentation, release workflow, commits, and PRs.
-
-**Trigger:** For Waitkit implementation, API design, core package changes,
-tests, debugging, release notes, Changesets, README/docs, package metadata,
-branch, commit, PR creation, PR review comments, QA, rerun, revision, or
-previous-result improvement requests, use the `orchestrator` skill. Simple
-one-off questions may be answered directly.
-
-Detailed harness changes are tracked in `.claude/CHANGELOG.md`.
+- **Path-scoped rules** in `.claude/rules/` load when matching files are touched:
+  `package-architecture.md`, `core-api-conventions.md`, `release-workflow.md`,
+  `git-workflow.md`.
+- **Skills** in `.claude/skills/`:
+  - `quality-gate`: run and report the gate before saying work is done.
+  - `code-review`: review a diff against the rules, findings first.
+  - `release-docs`: changesets, package READMEs, migration notes, release prep.
+  - `commit`, `write-pr`, `review-pr`: Git and GitHub side effects, used only when the user asks
+    for that step.
+- **Hooks** (`.claude/settings.json`): `preToolUse.sh` logs Bash commands to
+  `.claude/command.log` (gitignored) and blocks destructive commands and publishing;
+  `postToolUse.sh` reminds you of the gate after edits.
+- Harness changes are recorded in `.claude/CHANGELOG.md`.
