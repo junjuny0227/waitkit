@@ -16,6 +16,8 @@ Breaking changes (see `docs/migration-1.0.md`):
 - `controller.dispose()` replaces `restore()` and cannot be undone; `getState()` replaces `isEnabled()`/`getScenario()`.
 - Invalid configs throw `WaitKitConfigError` listing every issue, with hints for options removed in 1.0.
 - Aborting a request cancels a simulated delay or timeout. Setting up again disposes the previous controller.
-- React: `scenarioNames` prop and `useWaitKitScenario` removed; `useWaitKit` follows controller changes; new `useWaitKitEvent`.
+- React: `scenarioNames` prop and `useWaitKitScenario` removed; `useWaitKit` follows controller changes; new `useWaitKitEvent`. `react-dom` is now a peer dependency.
+- DevTools redesigned: shadow-root isolated panel with live wait progress, a collapsible launcher, `theme` and `shortcut` props.
+- Core: new `settle` event and a per-request `id` on request lifecycle events.
 - MSW: `withWaitKit(effects, resolver, options)` with the shared effect shape; MSW 2 and 3 supported.
 - Requires Node.js 22.18+ for the CLI and Node test environments. Licensed under Apache-2.0.
