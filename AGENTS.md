@@ -20,7 +20,7 @@ Run from the repo root. Requires Node.js 22.18+; pnpm is pinned by `packageManag
 | Command                                      | What it does                                                                    | Status                               |
 | -------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------ |
 | `pnpm install`                               | Install; the lockfile must stay in sync (CI uses `--frozen-lockfile`)           | verified (exit 0, 2026-11-27)        |
-| `pnpm check`                                 | format:check → lint → check-types → build → test, stops on first failure        | verified (exit 0, 2026-11-27)        |
+| `pnpm check`                                 | format:check → build → lint → check-types → test, stops on first failure        | verified (exit 0, 2026-11-27)        |
 | `pnpm format` / `pnpm format:check`          | oxfmt write / check                                                             | verified (exit 0, 2026-11-27)        |
 | `pnpm lint` / `pnpm lint:fix`                | oxlint with type-aware rules, warnings fail                                     | verified (exit 0, 2026-11-27)        |
 | `pnpm check-types`                           | `tsc` (TypeScript 7) in every package via Turbo                                 | verified (exit 0, 2026-11-27)        |
@@ -97,7 +97,7 @@ Never hand-edit these; change the source and regenerate.
 ## Gates
 
 - CI (`.github/workflows/ci.yml`) runs install with `--frozen-lockfile`, then format:check,
-  lint, check-types, build, and test on Node 22 and 24. It has not run on GitHub yet as of
+  build, lint, check-types, and test on Node 22 and 24. It has not run on GitHub yet as of
   2026-11-27.
 - `pnpm lint` uses `--deny-warnings`: a warning fails the gate.
 - `pnpm build` fails on publint errors, so `package.json` `main`/`module`/`exports`/`bin` must
@@ -105,8 +105,8 @@ Never hand-edit these; change the source and regenerate.
 
 ## Pitfalls
 
-- **Stale core types in dependents.** `check-types` and `test` read `@waitkit/core` from its
-  `dist`, not `src`. After changing core exports, run `pnpm --filter @waitkit/core build` before
+- **Stale core types in dependents.** `lint` (type-aware), `check-types`, and `test` read
+  `@waitkit/core` from its `dist`, not `src`; CI and `pnpm check` build before linting. After changing core exports, run `pnpm --filter @waitkit/core build` before
   running `tsc` or Vitest in another package alone, or you get "has no exported member" errors
   for code that exists.
 - **`isolatedDeclarations` is on.** Exported functions need explicit return types, and
