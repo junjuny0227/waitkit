@@ -27,6 +27,8 @@ export interface WaitKitDevToolsProps {
 const STORAGE_KEY = 'waitkit:devtools:open';
 
 function readStoredOpen(fallback: boolean): boolean {
+  // On the server there is nothing to restore, and touching Node's `localStorage` global warns.
+  if (typeof window === 'undefined') return fallback;
   try {
     const stored = globalThis.localStorage?.getItem(STORAGE_KEY);
     return stored === null || stored === undefined ? fallback : stored === 'true';
