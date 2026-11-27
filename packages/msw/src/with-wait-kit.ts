@@ -1,78 +1,50 @@
-import { resolveDelay, shouldTrigger, sleep, WaitKitTimeoutError } from '@waitkit/core';
-import { type DefaultBodyType, HttpResponse, type HttpResponseResolver } from 'msw';
+import {
+  applyOutcome,
+  resolveOutcome,
+  validateEffects,
+  WaitKitConfigError,
+  type WaitKitEffects,
+} from '@waitkit/core';
+import type { DefaultBodyType, HttpResponseResolver, PathParams } from 'msw';
 
-import type { WaitKitMswRule } from './types';
+export interface WithWaitKitOptions {
+  /** Random source for delay ranges and rates. Defaults to `Math.random`. */
+  random?: () => number;
+}
 
-const DEFAULT_TIMEOUT_MS = 30_000;
-
+/**
+ * Wraps an MSW HTTP resolver with Waitkit effects. The wrapped resolver waits for
+ * `delay`, then rejects for `timeout`, returns the simulated `error` response, or calls
+ * the original resolver. Aborting the request cancels any pending wait.
+ *
+ * URL and method matching stay with MSW (`http.get(path, ...)`), so only effects are
+ * accepted here. Supports MSW 2 and 3.
+ */
 export function withWaitKit<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Params extends Record<string, any> = any,
+  Params extends PathParams<keyof Params> = PathParams,
   RequestBodyType extends DefaultBodyType = DefaultBodyType,
   ResponseBodyType extends DefaultBodyType = DefaultBodyType,
 >(
-  rule: WaitKitMswRule,
+  effects: WaitKitEffects,
   resolver: HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>,
+  options: WithWaitKitOptions = {},
 ): HttpResponseResolver<Params, RequestBodyType, ResponseBodyType> {
-  return (async (args) => {
-    if (rule.delay !== undefined) {
-      await sleep(resolveDelay(rule.delay));
-    }
-
-    if (shouldTrigger(rule.timeoutRate)) {
-      const timeoutMs = rule.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-      await sleep(timeoutMs);
-      throw new WaitKitTimeoutError(
-        `WaitKit timed out ${args.request.method} ${args.request.url} after ${timeoutMs}ms.`,
-      );
-    }
-
-    if (shouldTrigger(rule.errorRate)) {
-      return createErrorResponse(rule.errorResponse);
-    }
-
-    return resolver(args);
-  }) as HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>;
-}
-
-function createErrorResponse(
-  errorResponse: WaitKitMswRule['errorResponse'],
-): HttpResponse<DefaultBodyType> {
-  const status = errorResponse?.status ?? 500;
-  const headers = new Headers(errorResponse?.headers);
-  const body = serializeBody(errorResponse?.body, headers);
-
-  return new HttpResponse(body, {
-    status,
-    statusText: errorResponse?.statusText,
-    headers,
-  });
-}
-
-function serializeBody(body: unknown, headers: Headers): BodyInit | null {
-  if (body === undefined || body === null) {
-    return null;
+  const issues = validateEffects(effects, 'withWaitKit');
+  if (issues.length > 0) {
+    throw new WaitKitConfigError(issues);
   }
 
-  if (typeof body === 'string') {
-    return body;
-  }
+  return (info) => {
+    const { request } = info;
+    const result = applyOutcome(resolveOutcome(effects, options), {
+      request: { method: request.method, url: request.url },
+      signal: request.signal,
+      passthrough: () => resolver(info),
+    });
 
-  if (body instanceof Blob || body instanceof FormData || body instanceof ArrayBuffer) {
-    return body;
-  }
-
-  if (ArrayBuffer.isView(body)) {
-    return body as BodyInit;
-  }
-
-  if (body instanceof URLSearchParams) {
-    return body;
-  }
-
-  if (!headers.has('content-type')) {
-    headers.set('content-type', 'application/json');
-  }
-
-  return JSON.stringify(body);
+    // A simulated error is a plain `Response` whose body deliberately does not match
+    // `ResponseBodyType`, which MSW's strict response typing cannot express.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return result as ReturnType<HttpResponseResolver<Params, RequestBodyType, ResponseBodyType>>;
+  };
 }

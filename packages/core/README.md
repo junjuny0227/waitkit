@@ -1,236 +1,166 @@
 # @waitkit/core
 
-Development-only fetch interceptor for intentionally testing loading, skeleton,
-error, timeout, and retry states.
+Development-only network simulation for `fetch`. Matching requests are delayed, answered with a
+simulated error response, or left hanging until they time out, so loading, error, timeout, and
+retry states can be tested on purpose.
 
-`@waitkit/core` patches `globalThis.fetch` and applies rules or named scenarios
-to matching requests. It is intended for local development and UI state testing,
-not for production network control.
-
-## Installation
-
-Install it as a development dependency if you only load Waitkit in development:
-
-```bash
+```sh
 npm install -D @waitkit/core
-# or
-pnpm add -D @waitkit/core
-# or
-yarn add -D @waitkit/core
-# or
-bun add -d @waitkit/core
 ```
 
-If your production source imports `@waitkit/core` directly, install it as a
-regular dependency instead:
+## Quick start
 
-```bash
-npm install @waitkit/core
-# or
-pnpm add @waitkit/core
-# or
-yarn add @waitkit/core
-# or
-bun add @waitkit/core
+```ts
+// waitkit.config.ts
+import { defineConfig } from '@waitkit/core';
+
+export default defineConfig({
+  rules: [{ url: '/api/*', delay: [200, 600] }],
+  scenarios: {
+    'server-error': [{ url: '/api/*', error: { status: 500, body: { message: 'Boom' } } }],
+    flaky: [{ url: '/api/orders', method: 'POST', error: { rate: 0.3, status: 503 } }],
+    timeout: [{ url: '/api/*', timeout: { ms: 5000 } }],
+  },
+});
 ```
 
-A common pattern is to load it only in development:
+```ts
+// main.ts
+import { setupWaitKit } from '@waitkit/core';
+
+import config from './waitkit.config';
+
+export const waitkit = setupWaitKit(config, { enabled: import.meta.env.DEV });
+```
+
+Waitkit is a development tool. Gate it on your environment, or import it dynamically so it is
+not part of production bundles:
 
 ```ts
 if (import.meta.env.DEV) {
-  const { setupWaitKit } = await import('@waitkit/core');
-
-  setupWaitKit({
-    rules: [{ url: '/api/users', delay: 1000 }],
-  });
+  const [{ setupWaitKit }, { default: config }] = await Promise.all([
+    import('@waitkit/core'),
+    import('./waitkit.config'),
+  ]);
+  setupWaitKit(config);
 }
 ```
 
-## Basic Usage
+## Rules
 
 ```ts
-import { setupWaitKit } from '@waitkit/core';
-
-const waitkit = setupWaitKit({
-  enabled: import.meta.env.DEV,
-  rules: [{ url: '/api/users', method: 'GET', delay: 1200 }],
-});
-
-waitkit.restore();
+interface WaitKitRule {
+  url: string | RegExp | ((url: URL) => boolean);
+  method?: HttpMethod | HttpMethod[];
+  delay?: number | [min: number, max: number];
+  timeout?: { rate?: number; ms?: number };
+  error?: {
+    rate?: number;
+    status?: number;
+    statusText?: string;
+    headers?: HeadersInit;
+    body?: unknown;
+  };
+}
 ```
+
+- **The first matching rule wins.** Put specific rules before broad ones.
+- **`url` as a string is a path pattern** matched against the whole pathname. `:name` matches one
+  segment, `*` matches the rest, the query string is ignored, and a trailing slash is optional.
+  `'/api/users'` does not match `/api/users/42`; use `'/api/users/*'` for that. A pattern with a
+  scheme (`'https://api.example.com/*'`) also matches the origin.
+- **`url` as a RegExp** is tested against the absolute URL. **As a function** it receives the
+  parsed `URL`.
+- **Effects run in order: `delay`, then `timeout`, then `error`.** A request can be delayed and
+  then fail.
+- **`rate` defaults to 1.** `error: { status: 503 }` always fails; `error: { rate: 0.1 }` fails
+  one request in ten. `timeout.ms` defaults to 30 000 and `error.status` to 500.
+- **Error bodies**: plain objects and arrays are sent as JSON with
+  `content-type: application/json` unless you set one. Strings, `Blob`, `ArrayBuffer`, typed
+  arrays, `FormData`, and `URLSearchParams` are sent as-is.
+- **Timeouts** wait `ms` and then reject with `WaitKitTimeoutError`.
+- **Aborting** a request (`AbortController`) while it is delayed or hanging rejects it at once
+  with the signal's reason, like a real `fetch`.
 
 ## Scenarios
 
-Use scenarios when you want to switch between named network states while
-developing a screen.
+`rules` apply while no scenario is active. Activating a scenario replaces them with that
+scenario's rules; the two are never merged.
 
 ```ts
-import { setupWaitKit } from '@waitkit/core';
-
-const waitkit = setupWaitKit({
-  enabled: import.meta.env.DEV,
-  activeScenario: 'slow-network',
-  scenarios: {
-    'slow-network': [{ url: '/api/users', method: 'GET', delay: [800, 2000] }],
-    'server-error': [
-      {
-        url: '/api/payment',
-        method: 'POST',
-        delay: 500,
-        errorRate: 1,
-        errorResponse: {
-          status: 500,
-          body: { message: 'Payment failed' },
-        },
-      },
-    ],
-    timeout: [{ url: '/api/report', timeoutRate: 1, timeoutMs: 5000 }],
-  },
-});
-
 waitkit.setScenario('server-error');
-waitkit.resetScenario();
-waitkit.restore();
+waitkit.resetScenario(); // back to `rules`
+waitkit.scenarios; // ['server-error', 'flaky', 'timeout']
 ```
 
-## Error Responses
+## Controller
 
-Object bodies are serialized as JSON and receive `content-type:
-application/json` when no content type is already provided.
-When `statusText` is omitted, Waitkit uses the runtime `Response` default for
-the configured status.
+| Member                   | Description                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `getState()`             | `{ enabled, scenario, disposed }`. Returns the same object until it changes.  |
+| `enable()` / `disable()` | Pause or resume simulation. While disabled every request goes to the network. |
+| `setScenario(name)`      | Activate a scenario. Throws for an unknown name.                              |
+| `resetScenario()`        | Go back to the base `rules`.                                                  |
+| `scenarios`              | Scenario names in declaration order.                                          |
+| `on(type, listener)`     | Subscribe to an event. Returns an unsubscribe function.                       |
+| `dispose()`              | Restore the original `fetch`. A disposed controller cannot be re-enabled.     |
+
+Only one controller is active at a time. Calling `setupWaitKit` again, for example after a hot
+module reload, disposes the previous controller first.
+
+### Events
+
+| Event        | When                                                                                   |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `request`    | Every request while enabled, matched or not                                            |
+| `match`      | A rule matched; `event.outcome` says what will happen                                  |
+| `delayStart` | Before a delay                                                                         |
+| `delayEnd`   | After a delay                                                                          |
+| `error`      | Before a timeout starts waiting or a simulated error is returned                       |
+| `settle`     | A simulated request ended: `result` is `passthrough`, `error`, `timeout`, or `aborted` |
+| `change`     | `enabled`, `scenario`, or `disposed` changed (`previous`/`current`)                    |
+
+Events for one simulated request (`match`, `delayStart`, `delayEnd`, `error`, `settle`) carry the same `id`.
+
+## Options
 
 ```ts
-setupWaitKit({
-  enabled: import.meta.env.DEV,
-  rules: [
-    {
-      url: '/api/login',
-      method: 'POST',
-      errorRate: 1,
-      errorResponse: {
-        status: 401,
-        body: { message: 'Invalid credentials' },
-      },
-    },
-  ],
+setupWaitKit(config, {
+  enabled: true, // start enabled (default)
+  random: Math.random, // replace for deterministic tests
+  debug: false, // log simulated requests with console.info
 });
 ```
 
-## Timeouts
-
-Timeout rules throw a `WaitKitTimeoutError`. If a rule also has `delay`,
-Waitkit waits for the delay first and then waits for `timeoutMs`, so the total
-simulated wait can be `delay + timeoutMs`.
+Pass a fixed `random` in tests to make delay ranges and rates deterministic:
 
 ```ts
-setupWaitKit({
-  enabled: import.meta.env.DEV,
-  rules: [{ url: '/api/report', timeoutRate: 1, timeoutMs: 5000 }],
-});
+setupWaitKit(config, { random: () => 0 }); // every rate above 0 triggers, ranges use their min
 ```
 
-Waitkit does not currently cancel simulated delay or timeout sleeps when a
-request `AbortSignal` aborts.
+## Validation
 
-## Controller API
+`setupWaitKit` validates the config and throws a `WaitKitConfigError` that lists every problem
+with its path, such as `scenarios.flaky[0].error.rate: must be a number between 0 and 1`.
+Options removed in 1.0 are reported with their replacement. `validateConfig(config)` returns
+the issues without throwing, and `isWaitKitConfig(value)` is its type-guard form.
 
-`setupWaitKit` returns a controller:
+## Building your own adapter
 
-- `enable()`: Enables rule matching.
-- `disable()`: Bypasses all rules and calls the original `fetch`.
-- `restore()`: Restores the original `fetch`.
-- `isEnabled()`: Returns whether rule matching is enabled.
-- `setScenario(name)`: Uses a named scenario.
-- `getScenario()`: Returns the active scenario name.
-- `resetScenario()`: Clears the active scenario and falls back to `rules`.
-- `addEventListener(type, listener)`: Subscribes to an event. Returns an unsubscribe function.
+The decision and its execution are exported separately, so a new transport behaves exactly like
+`fetch`:
 
 ```ts
-const controller = setupWaitKit({
-  enabled: import.meta.env.DEV,
-  rules: [{ url: '/api/users', delay: 1000 }],
-});
+import { applyOutcome, resolveOutcome } from '@waitkit/core';
 
-const unsubscribe = controller.addEventListener('match', (event) => {
-  console.log(event.url, event.delayMs);
-});
-
-// later
-unsubscribe();
-```
-
-Supported event types: `request`, `match`, `error`, `scenarioChange`.
-`addEventListener` is an alternative to the inline `onXxx` options and is useful when you need to attach or detach listeners dynamically at runtime.
-
-## Rule Options
-
-- `url`: `string`, `RegExp`, or `(url: string) => boolean`.
-- `method`: HTTP method or method array.
-- `delay`: Fixed milliseconds or `[min, max]` random range.
-- `errorRate`: Probability from `0` to `1` for returning an error response.
-- `errorResponse`: Simulated response status, headers, status text, and body.
-- `timeoutRate`: Probability from `0` to `1` for throwing a timeout error.
-- `timeoutMs`: Time to wait before throwing the timeout error.
-
-The first matching rule is applied.
-
-## Rule Matching
-
-String, `RegExp`, and predicate URL matchers receive the request's full URL
-string, including any query string. Use a predicate matcher if you want to
-match only part of the URL.
-
-```ts
-setupWaitKit({
-  rules: [
-    {
-      url: (url) => new URL(url, window.location.origin).pathname === '/api/users',
-      delay: 1000,
-    },
-  ],
+const outcome = resolveOutcome(rule); // { kind: 'passthrough' | 'error' | 'timeout', delayMs, ... }
+const result = await applyOutcome(outcome, {
+  request: { method, url },
+  signal,
+  passthrough: () => sendForReal(),
 });
 ```
 
-When multiple rules match a request, the first matching rule in the array wins.
+## License
 
-## Events
-
-```ts
-setupWaitKit({
-  enabled: import.meta.env.DEV,
-  rules: [{ url: '/api/users', delay: 1000 }],
-  onRequest: (event) => console.log(event.url),
-  onMatch: (event) => console.log(event.rule),
-  onDelayStart: (event) => console.log(event.delayMs),
-  onDelayEnd: (event) => console.log(event.delayMs),
-  onError: (event) => console.error(event.error),
-  onScenarioChange: (event) => console.log(event.scenario),
-});
-```
-
-Event payloads include the original `input` and `init`, normalized `url` and
-`method`, and match events also include the matched `rule`, active `scenario`
-name, and resolved `delayMs`. `onError` additionally receives the simulated
-`error`.
-
-The request lifecycle event names are stable: `onRequest`, `onMatch`,
-`onDelayStart`, `onDelayEnd`, and `onError`.
-
-`onScenarioChange` runs when `setScenario()` or `resetScenario()` changes the
-active scenario. It does not run for the initial `activeScenario` value passed
-to `setupWaitKit`, setting the same scenario again, or resetting when no
-scenario is active. Its payload includes `previousScenario`, `scenario`, and
-`reason` (`setScenario` or `resetScenario`).
-
-## Production Safety
-
-Waitkit does not force development-only usage. Gate it explicitly with your
-environment flag:
-
-```ts
-setupWaitKit({
-  enabled: import.meta.env.DEV,
-  rules: [{ url: '/api/users', delay: 1000 }],
-});
-```
+Apache-2.0

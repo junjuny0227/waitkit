@@ -1,41 +1,47 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-type FetchState<T> =
-  | { status: 'idle' }
+export type FetchState<T> =
   | { status: 'loading' }
   | { status: 'success'; data: T }
   | { status: 'error'; message: string };
 
-export function useFetch<T>(url: string) {
-  const [state, setState] = useState<FetchState<T>>({ status: 'idle' });
-  const abortRef = useRef<AbortController | null>(null);
-
-  const load = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setState({ status: 'loading' });
-
-    try {
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setState({ status: 'error', message: body.message ?? `HTTP ${res.status}` });
-        return;
-      }
-      const data: T = await res.json();
-      setState({ status: 'success', data });
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      setState({ status: 'error', message: (err as Error).message });
+async function request<T>(url: string, signal: AbortSignal): Promise<FetchState<T>> {
+  try {
+    const response = await fetch(url, { signal });
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      const message =
+        typeof body === 'object' && body !== null && 'message' in body
+          ? String(body.message)
+          : `HTTP ${response.status}`;
+      return { status: 'error', message };
     }
-  }, [url]);
+    // Trusting the example API's shape; real code would validate it.
+    const data: T = await response.json();
+    return { status: 'success', data };
+  } catch (error) {
+    return { status: 'error', message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Fetches `url` once per mount and aborts it on unmount. To refetch, remount the
+ * component with a new `key`; Waitkit then rejects the pending delay with an AbortError.
+ */
+export function useFetch<T>(url: string): FetchState<T> {
+  const [state, setState] = useState<FetchState<T>>({ status: 'loading' });
 
   useEffect(() => {
-    load();
-    return () => abortRef.current?.abort();
-  }, [load]);
+    const controller = new AbortController();
 
-  return { state, reload: load };
+    const run = async () => {
+      const next = await request<T>(url, controller.signal);
+      if (!controller.signal.aborted) setState(next);
+    };
+    void run();
+
+    return () => controller.abort();
+  }, [url]);
+
+  return state;
 }

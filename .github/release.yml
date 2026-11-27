@@ -1,0 +1,14 @@
+# Groups GitHub's generated release notes by PR label.
+# Labels are set automatically from the branch prefix (.github/labeler.yml).
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement]
+    - title: Fixes
+      labels: [bug]
+    - title: Documentation
+      labels: [documentation]
+    - title: CI and maintenance
+      labels: [ci, chore]
+    - title: Other changes
+      labels: ['*']

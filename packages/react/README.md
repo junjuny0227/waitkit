@@ -1,128 +1,81 @@
 # @waitkit/react
 
-React provider and hooks for using a Waitkit controller in development UI.
+React bindings for [`@waitkit/core`](../core): a provider, hooks, and a floating devtools panel
+to toggle Waitkit and switch scenarios while the app runs.
 
-`@waitkit/react` does not call `setupWaitKit` for you. Create the controller
-with `@waitkit/core`, then pass it to `WaitKitProvider`.
-
-## Installation
-
-```bash
-npm install @waitkit/core @waitkit/react
-# or
-pnpm add @waitkit/core @waitkit/react
-# or
-yarn add @waitkit/core @waitkit/react
-# or
-bun add @waitkit/core @waitkit/react
+```sh
+npm install -D @waitkit/core @waitkit/react
 ```
 
-## Provider
+## Usage
 
 ```tsx
 import { setupWaitKit } from '@waitkit/core';
-import { WaitKitProvider } from '@waitkit/react';
+import { WaitKitDevTools, WaitKitProvider } from '@waitkit/react';
 
-const scenarios = {
-  'slow-network': [{ url: '/api/users', delay: 1000 }],
-  'server-error': [{ url: '/api/users', errorRate: 1 }],
-};
+import config from './waitkit.config';
 
-const scenarioNames = Object.keys(scenarios);
+const waitkit = setupWaitKit(config, { enabled: import.meta.env.DEV });
 
-const waitkit = setupWaitKit({
-  enabled: import.meta.env.DEV,
-  activeScenario: 'slow-network',
-  scenarios,
-});
-
-root.render(
-  <WaitKitProvider controller={waitkit} scenarioNames={scenarioNames}>
-    <App />
-  </WaitKitProvider>,
-);
-```
-
-Pass a stable `scenarioNames` array. Avoid creating it inline during render,
-because changing the array reference recreates the React store.
-
-## useWaitKit
-
-```tsx
-import { useWaitKit } from '@waitkit/react';
-
-function WaitKitToggle() {
-  const waitkit = useWaitKit();
-
+export function Root() {
   return (
-    <button onClick={waitkit.enabled ? waitkit.disable : waitkit.enable}>
-      {waitkit.enabled ? 'Disable Waitkit' : 'Enable Waitkit'}
-    </button>
+    <WaitKitProvider controller={waitkit}>
+      <App />
+      {import.meta.env.DEV && <WaitKitDevTools />}
+    </WaitKitProvider>
   );
 }
 ```
 
-`useWaitKit` returns:
+## `<WaitKitDevTools />`
 
-- `enabled`: whether rule matching is enabled.
-- `scenario`: active scenario name.
-- `scenarioNames`: scenario names passed to `WaitKitProvider`.
-- `controller`: original core controller.
-- `enable()`, `disable()`, `restore()`: controller methods that also update React subscribers.
+A floating panel with an on/off switch, one chip per scenario plus `base` (no scenario), and
+the activity of simulated requests. Requests that are still waiting show the remaining time and
+a progress bar; finished ones show how they ended (delay, error status, timeout, or aborted).
+It collapses to a small launcher that shows the current scenario and how many requests are
+waiting, remembers its open state in `localStorage`, and renders nothing once the controller
+is disposed. The panel lives in a shadow root, so your app's CSS does not affect it.
 
-## useWaitKitScenario
+Requires `react-dom` (the panel is rendered through a portal).
+
+| Prop            | Default          | Description                                                    |
+| --------------- | ---------------- | -------------------------------------------------------------- |
+| `position`      | `'bottom-right'` | `'bottom-right'`, `'bottom-left'`, `'top-right'`, `'top-left'` |
+| `defaultOpen`   | `true`           | Start expanded when no open state is stored yet                |
+| `maxLogEntries` | `20`             | Number of requests kept in the activity list                   |
+| `theme`         | `'dark'`         | `'dark'`, `'light'`, or `'system'`                             |
+| `shortcut`      | `'alt+shift+w'`  | Shortcut that toggles the panel; `false` disables it           |
+
+## Hooks
+
+### `useWaitKit()`
+
+Returns the controller state and its actions, and re-renders whenever the state changes, also
+when the controller is changed outside React.
 
 ```tsx
-import { useWaitKitScenario } from '@waitkit/react';
-
-function ScenarioSelect() {
-  const { scenario, scenarioNames, setScenario, resetScenario } = useWaitKitScenario();
-
-  return (
-    <select
-      value={scenario ?? ''}
-      onChange={(event) => {
-        const value = event.currentTarget.value;
-        value === '' ? resetScenario() : setScenario(value);
-      }}
-    >
-      <option value="">Default rules</option>
-      {scenarioNames.map((name) => (
-        <option key={name} value={name}>
-          {name}
-        </option>
-      ))}
-    </select>
-  );
+function ScenarioPicker() {
+  const { scenario, scenarios, setScenario, resetScenario, enabled, enable, disable } =
+    useWaitKit();
+  // ...
 }
 ```
 
-## WaitKitDevTools
+### `useWaitKitEvent(type, listener)`
 
-`WaitKitDevTools` renders a fixed floating panel for development. It shows the
-current enabled/disabled status, a scenario switcher, and a live log of recent
-matched and error requests.
+Subscribes to a controller event for the lifetime of the component. The listener does not need
+to be memoized.
 
 ```tsx
-import { WaitKitDevTools } from '@waitkit/react';
-
-root.render(
-  <WaitKitProvider controller={waitkit} scenarioNames={scenarioNames}>
-    <App />
-    <WaitKitDevTools />
-  </WaitKitProvider>,
-);
+useWaitKitEvent('error', (event) => toast(`Simulated failure: ${event.url}`));
 ```
 
-Props:
+### `useWaitKitController()`
 
-- `maxLogEntries` (optional, default `20`): Maximum number of log entries to keep.
+Returns the controller from the nearest provider.
 
-`WaitKitDevTools` must be rendered inside `WaitKitProvider`. It reads state
-from context and calls controller methods directly — no additional setup needed.
+All hooks throw when used outside `<WaitKitProvider>`.
 
-## Controller Updates
+## License
 
-Use the methods returned by `useWaitKit` and `useWaitKitScenario` from React UI.
-If you call the original controller directly outside React, React subscribers
-will not be notified automatically.
+Apache-2.0

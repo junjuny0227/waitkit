@@ -1,132 +1,53 @@
 # @waitkit/msw
 
-MSW handler wrapper for applying [Waitkit](https://github.com/junjuny0227/waitkit) delay, error, and timeout simulation.
+[Waitkit](../core) effects for [Mock Service Worker](https://mswjs.io) handlers: delay a mocked
+response, replace it with a simulated error, or let it hang until it times out. Works with MSW 2
+and 3.
 
-`@waitkit/msw` wraps MSW v2 resolver functions so Waitkit rules run inside the
-MSW handler pipeline — no `globalThis.fetch` patching needed.
-
-## Requirements
-
-- msw **v2 or later**
-- @waitkit/core **v0.3 or later** (installed automatically)
-
-## Installation
-
-```bash
-npm install -D @waitkit/msw
-# or
-pnpm add -D @waitkit/msw
-# or
-yarn add -D @waitkit/msw
-# or
-bun add -D @waitkit/msw
+```sh
+npm install -D @waitkit/msw msw
 ```
 
 ## Usage
 
-### `withWaitKit(rule, resolver)`
-
-Wraps an MSW resolver with a `WaitKitMswRule`. The rule is evaluated before the
-resolver runs: delay first, then timeout, then error.
-
-```typescript
-import { http, HttpResponse } from 'msw';
+```ts
 import { withWaitKit } from '@waitkit/msw';
+import { HttpResponse, http } from 'msw'; // MSW 3: import { HttpResponse, http } from 'msw/http'
 
 export const handlers = [
-  // 1.5 second delay before responding
   http.get(
     '/api/users',
-    withWaitKit({ delay: 1500 }, () => HttpResponse.json([{ id: 1, name: 'Alice' }])),
+    withWaitKit({ delay: [300, 1200] }, () => HttpResponse.json([{ id: 1, name: 'Ada' }])),
   ),
-
-  // 30% chance of a 500 error
   http.post(
     '/api/orders',
-    withWaitKit(
-      { errorRate: 0.3, errorResponse: { status: 500, body: { message: 'Server Error' } } },
-      async ({ request }) => {
-        const body = await request.json();
-        return HttpResponse.json({ id: 99, ...body });
-      },
+    withWaitKit({ error: { rate: 0.2, status: 503, body: { message: 'Try again' } } }, () =>
+      HttpResponse.json({ ok: true }, { status: 201 }),
     ),
   ),
-
-  // always timeout after 3 seconds
   http.get(
-    '/api/slow',
-    withWaitKit({ timeoutRate: 1, timeoutMs: 3000 }, () => HttpResponse.json({})),
+    '/api/report',
+    withWaitKit({ timeout: { ms: 10_000 } }, () => HttpResponse.json({})),
   ),
 ];
 ```
 
-### `WaitKitMswRule`
+`withWaitKit(effects, resolver, options?)` takes the same `delay`, `timeout`, and `error` effects
+as a `@waitkit/core` rule; URL and method matching stay with MSW. The resolver's arguments keep
+their MSW types, including `params`.
 
-A subset of `WaitKitRule` without `url` and `method`. MSW handlers already
-know their URL and method, so those fields are not needed.
+Behavior is shared with `@waitkit/core`:
 
-```typescript
-import type { WaitKitMswRule } from '@waitkit/msw';
+- Effects run in order: `delay`, then `timeout`, then `error`, otherwise your resolver.
+- `rate` defaults to 1; `timeout.ms` defaults to 30 000; `error.status` defaults to 500.
+- Aborting the request cancels a pending delay or timeout.
+- Invalid effects throw a `WaitKitConfigError` when the handler is created.
 
-const slowNetworkRule: WaitKitMswRule = {
-  delay: [800, 2000], // fixed ms or [min, max] range
-  errorRate: 0.2, // probability of error (0–1)
-  errorResponse: {
-    status: 503,
-    body: { message: 'Unavailable' },
-  },
-  timeoutRate: 0, // probability of timeout (0–1)
-  timeoutMs: 5000, // timeout duration in ms (default 30000)
-};
-```
+A timeout rejects with `WaitKitTimeoutError`. MSW turns an exception thrown by a resolver into a
+500 response, so with MSW the client sees a late 500 rather than a network error.
 
-## Switching scenarios with `server.use()`
-
-Use MSW's `server.use()` to override handlers at runtime.
-
-```typescript
-import { server } from './msw-server';
-import { http } from 'msw';
-import { withWaitKit } from '@waitkit/msw';
-
-// activate slow-network scenario
-server.use(
-  http.get(
-    '/api/*',
-    withWaitKit({ delay: 2000 }, ({ request }) => fetch(request)),
-  ),
-);
-
-// reset to original handlers
-server.resetHandlers();
-```
-
-## Timeout behavior
-
-When `timeoutRate` triggers, `WaitKitTimeoutError` is thrown. MSW treats an
-unhandled thrown error as a network failure.
-
-```typescript
-import { WaitKitTimeoutError } from '@waitkit/core';
-
-try {
-  await fetch('/api/slow');
-} catch (error) {
-  if (error instanceof WaitKitTimeoutError) {
-    console.log('request timed out');
-  }
-}
-```
-
-## Evaluation order
-
-For each request, the rule options are evaluated in this order:
-
-1. **delay** — wait before calling the resolver
-2. **timeoutRate** — if triggered, throw `WaitKitTimeoutError`
-3. **errorRate** — if triggered, return an `errorResponse`-based `HttpResponse`
-4. call the original resolver
+Pass `{ random }` as the third argument to make rates and delay ranges deterministic in tests.
 
 ## License
 
-MIT
+Apache-2.0

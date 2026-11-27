@@ -1,59 +1,79 @@
-import type { WaitKitRule } from './types';
+import type { HttpMethod, UrlMatcher, WaitKitRule } from './types';
 
-export function matchesRule(rule: WaitKitRule, url: string, method: string): boolean {
-  return matchesUrl(rule.url, url) && matchesMethod(rule.method, method);
+export interface NormalizedRequest {
+  url: URL;
+  method: string;
 }
 
-function matchesUrl(ruleUrl: WaitKitRule['url'], url: string): boolean {
-  if (typeof ruleUrl === 'string') {
-    return url.includes(ruleUrl);
-  }
+const FALLBACK_BASE = 'http://localhost';
+const SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
+const compiledPatterns = new Map<string, RegExp>();
 
-  if (ruleUrl instanceof RegExp) {
-    return ruleUrl.test(url);
-  }
+/** Resolves fetch arguments to an absolute URL and an upper-case method. */
+export function normalizeRequest(input: RequestInfo | URL, init?: RequestInit): NormalizedRequest {
+  const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const method =
+    init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : 'GET');
 
-  return ruleUrl(url);
+  return {
+    url: new URL(raw, globalThis.location?.href ?? FALLBACK_BASE),
+    method: method.toUpperCase(),
+  };
 }
 
-function matchesMethod(ruleMethod: WaitKitRule['method'], method: string): boolean {
-  if (ruleMethod === undefined) {
+/** Returns the first rule matching the request; rule order is priority. */
+export function selectRule<R extends WaitKitRule>(
+  rules: readonly R[],
+  request: NormalizedRequest,
+): R | undefined {
+  return rules.find(
+    (rule) => matchesMethod(rule.method, request.method) && matchesUrl(rule.url, request.url),
+  );
+}
+
+export function matchesUrl(matcher: UrlMatcher, url: URL): boolean {
+  if (typeof matcher === 'string') {
+    const target = SCHEME.test(matcher) ? `${url.origin}${url.pathname}` : url.pathname;
+    return compilePattern(matcher).test(target);
+  }
+
+  if (matcher instanceof RegExp) {
+    matcher.lastIndex = 0;
+    return matcher.test(url.href);
+  }
+
+  return matcher(url);
+}
+
+function matchesMethod(
+  expected: HttpMethod | readonly HttpMethod[] | undefined,
+  method: string,
+): boolean {
+  if (expected === undefined) {
     return true;
   }
 
-  const normalizedMethod = normalizeMethod(method);
-
-  if (typeof ruleMethod === 'string') {
-    return normalizeMethod(ruleMethod) === normalizedMethod;
-  }
-
-  return ruleMethod.some((item) => normalizeMethod(item) === normalizedMethod);
+  const methods: readonly string[] = typeof expected === 'string' ? [expected] : expected;
+  return methods.includes(method);
 }
 
-export function normalizeMethod(method: string | undefined): string {
-  return (method ?? 'GET').toUpperCase();
-}
+function compilePattern(pattern: string): RegExp {
+  let compiled = compiledPatterns.get(pattern);
 
-export function getRequestUrl(input: RequestInfo | URL): string {
-  if (typeof input === 'string') {
-    return input;
+  if (compiled === undefined) {
+    const source = pattern
+      .replace(/\/+$/, '')
+      .split(/(\*|:[A-Za-z_]\w*)/)
+      .map((part) => {
+        if (part === '*') return '.*';
+        if (part.startsWith(':')) return '[^/]+';
+        return part.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+      })
+      .join('');
+
+    compiled = new RegExp(`^${source}/?$`);
+    compiledPatterns.set(pattern, compiled);
   }
 
-  if (input instanceof URL) {
-    return input.toString();
-  }
-
-  return input.url;
-}
-
-export function getRequestMethod(input: RequestInfo | URL, init?: RequestInit): string {
-  if (init?.method !== undefined) {
-    return normalizeMethod(init.method);
-  }
-
-  if (typeof input === 'string' || input instanceof URL) {
-    return 'GET';
-  }
-
-  return normalizeMethod(input.method);
+  return compiled;
 }

@@ -1,0 +1,12 @@
+# Label PRs from the branch prefix used in this repo (feat/, fix/, docs/, ci/, chore/ ...).
+# The labels drive the release-note sections in .github/release.yml.
+enhancement:
+  - head-branch: ['^feat/']
+bug:
+  - head-branch: ['^fix/']
+documentation:
+  - head-branch: ['^docs/']
+ci:
+  - head-branch: ['^ci/']
+chore:
+  - head-branch: ['^chore/', '^refactor/', '^test/', '^release/']

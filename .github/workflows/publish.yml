@@ -1,0 +1,67 @@
+name: Publish to npm
+
+# Runs when a draft created by release.yml is published. npm authenticates this workflow
+# through trusted publishing (OIDC), so there is no NPM_TOKEN. Every package's trusted
+# publisher on npmjs.com must name this repository, this file (publish.yml), and the `npm`
+# environment.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ github.event.release.tag_name }}
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TURBO_UI: stream
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      # pnpm version comes from the root package.json `packageManager` field.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      # No registry-url: it writes an _authToken line to .npmrc, which disables the OIDC exchange.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Check versions
+        run: node scripts/check-release-version.mjs "$TAG"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # pnpm rewrites workspace:^ dependencies to real versions and skips versions that are
+      # already on npm, so a re-run after a partial failure only publishes what is missing.
+      - name: Publish packages
+        run: |
+          set -euo pipefail
+          dist_tag=latest
+          if [[ "$TAG" == *-* ]]; then dist_tag=next; fi
+          pnpm --recursive --filter "./packages/*" publish \
+            --access public --provenance --no-git-checks --tag "$dist_tag" --report-summary
+
+      - name: Show published packages
+        if: always()
+        run: cat pnpm-publish-summary.json 2>/dev/null || echo "No summary written."

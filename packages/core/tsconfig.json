@@ -1,8 +1,4 @@
 {
-  "extends": "@waitkit/typescript-config/base.json",
-  "compilerOptions": {
-    "outDir": "dist"
-  },
-  "include": ["src", "tests", "tsup.config.ts", "vitest.config.ts", "eslint.config.mjs"],
-  "exclude": ["node_modules", "dist"]
+  "extends": "../../tsconfig.base.json",
+  "include": ["src", "tests", "*.config.ts"]
 }
