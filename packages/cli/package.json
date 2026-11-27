@@ -1,6 +1,6 @@
 {
   "name": "@waitkit/cli",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Command line tool to create, list, and validate waitkit.config files.",
   "keywords": [
     "cli",

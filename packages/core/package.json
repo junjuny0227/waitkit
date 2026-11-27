@@ -1,6 +1,6 @@
 {
   "name": "@waitkit/core",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Development-only network simulation for fetch: delays, error responses, and timeouts driven by rules and scenarios.",
   "keywords": [
     "delay",

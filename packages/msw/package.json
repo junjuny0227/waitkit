@@ -1,6 +1,6 @@
 {
   "name": "@waitkit/msw",
-  "version": "0.1.3",
+  "version": "1.0.0",
   "description": "Waitkit delays, error responses, and timeouts for Mock Service Worker handlers.",
   "keywords": [
     "delay",
