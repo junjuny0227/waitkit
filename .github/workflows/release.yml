@@ -1,0 +1,63 @@
+name: Draft release
+
+# A v* tag (pushed after the version PR is merged) runs the quality gate and creates a draft
+# GitHub release. Nothing is published to npm here: publish.yml runs when the draft is published.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    name: Check tag matches package versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Test the version check
+        run: node --test scripts/check-release-version.test.mjs
+
+      - name: Check versions
+        run: node scripts/check-release-version.mjs "$GITHUB_REF_NAME"
+
+  quality-gate:
+    name: Quality gate
+    needs: check-version
+    uses: ./.github/workflows/ci.yml
+
+  draft:
+    name: Create draft release
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Create draft with notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed "s/{{VERSION}}/${VERSION}/g" .github/release-notes.md > notes.md
+          prerelease=false
+          if [[ "$VERSION" == *-* ]]; then prerelease=true; fi
+          # --generate-notes appends GitHub's notes (PRs since the previous tag, grouped by
+          # label per .github/release.yml) after notes.md. Add "## Highlights" on top of the
+          # draft before publishing (docs/releasing.md).
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --prerelease="$prerelease" \
+            --title "Waitkit ${VERSION}" --notes-file notes.md --generate-notes
