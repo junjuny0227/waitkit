@@ -17,20 +17,20 @@ behind it are in `docs/rfc-1.0.md`; user-facing changes from 0.x are in `docs/mi
 Run from the repo root. Requires Node.js 22.18+; pnpm is pinned by `packageManager` in
 `package.json` (corepack or pnpm's own version switching picks it up).
 
-| Command                                      | What it does                                                             | Status                        |
-| -------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------- |
-| `pnpm install`                               | Install; the lockfile must stay in sync (CI uses `--frozen-lockfile`)    | verified (exit 0, 2026-11-27) |
-| `pnpm check`                                 | format:check → lint → check-types → build → test, stops on first failure | verified (exit 0, 2026-11-27) |
-| `pnpm format` / `pnpm format:check`          | oxfmt write / check                                                      | verified (exit 0, 2026-11-27) |
-| `pnpm lint` / `pnpm lint:fix`                | oxlint with type-aware rules, warnings fail                              | verified (exit 0, 2026-11-27) |
-| `pnpm check-types`                           | `tsc` (TypeScript 7) in every package via Turbo                          | verified (exit 0, 2026-11-27) |
-| `pnpm build`                                 | tsdown builds; publint and attw run inside the build                     | verified (exit 0, 2026-11-27) |
-| `pnpm test`                                  | Vitest in each package; `apps/example` runs `waitkit validate`           | verified (exit 0, 2026-11-27) |
-| `pnpm --filter <pkg> exec vitest run <file>` | One package or one file                                                  | verified (exit 0, 2026-11-27) |
-| `pnpm --filter example dev`                  | Example app on Vite; `/api` is proxied to JSONPlaceholder                | verified (served, 2026-11-27) |
-| `pnpm changeset`                             | Add a release note for npm-visible changes                               | unverified (interactive)      |
-| `pnpm changeset status`                      | Show pending version bumps                                               | verified (exit 0, 2026-11-27) |
-| `pnpm release`                               | Build and publish to npm                                                 | never run by agents           |
+| Command                                      | What it does                                                                    | Status                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------ |
+| `pnpm install`                               | Install; the lockfile must stay in sync (CI uses `--frozen-lockfile`)           | verified (exit 0, 2026-11-27)        |
+| `pnpm check`                                 | format:check → lint → check-types → build → test, stops on first failure        | verified (exit 0, 2026-11-27)        |
+| `pnpm format` / `pnpm format:check`          | oxfmt write / check                                                             | verified (exit 0, 2026-11-27)        |
+| `pnpm lint` / `pnpm lint:fix`                | oxlint with type-aware rules, warnings fail                                     | verified (exit 0, 2026-11-27)        |
+| `pnpm check-types`                           | `tsc` (TypeScript 7) in every package via Turbo                                 | verified (exit 0, 2026-11-27)        |
+| `pnpm build`                                 | tsdown builds; publint and attw run inside the build                            | verified (exit 0, 2026-11-27)        |
+| `pnpm test`                                  | Vitest in each package; `apps/example` runs `waitkit validate`                  | verified (exit 0, 2026-11-27)        |
+| `pnpm --filter <pkg> exec vitest run <file>` | One package or one file                                                         | verified (exit 0, 2026-11-27)        |
+| `pnpm --filter example dev`                  | Example app on Vite; `/api` is proxied to JSONPlaceholder                       | verified (served, 2026-11-27)        |
+| `pnpm changeset`                             | Add a release note for npm-visible changes                                      | unverified (interactive)             |
+| `pnpm changeset status`                      | Show pending version bumps                                                      | verified (exit 0, 2026-11-27)        |
+| `pnpm release:check v<version>`              | Check every package is at the tag's version (release flow: `docs/releasing.md`) | verified (exit 1 on 0.x, 2026-11-27) |
 
 Set `TURBO_UI=stream` when capturing Turbo output: `turbo.json` uses the TUI, which garbles logs.
 
@@ -148,6 +148,9 @@ Never hand-edit these; change the source and regenerate.
 - Changesets: `patch` for fixes and npm-visible doc fixes, `minor` for backwards-compatible
   features, `major` for breaking changes. No changeset for repo-only docs or tooling.
 - Do not commit, push, open PRs, reply on GitHub, or publish unless the user asks for that step.
+- Releases: all packages share one version (changesets `fixed`). npm publishing runs only in
+  `.github/workflows/publish.yml` after a person publishes the draft GitHub release; never push
+  `v*` tags or publish releases unless asked. Steps: `docs/releasing.md`.
 - License: Apache-2.0 for 1.0 onward. New publishable packages need `LICENSE` and `NOTICE` copies
   and `"license": "Apache-2.0"`.
 
