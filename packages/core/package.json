@@ -1,61 +1,63 @@
 {
   "name": "@waitkit/core",
   "version": "0.5.0",
-  "description": "Development-only fetch interceptor for testing loading, error, and timeout states.",
-  "type": "module",
-  "license": "MIT",
-  "author": "junjuny0227",
-  "homepage": "https://github.com/junjuny0227/waitkit#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/junjuny0227/waitkit.git"
-  },
+  "description": "Development-only network simulation for fetch: delays, error responses, and timeouts driven by rules and scenarios.",
+  "keywords": [
+    "delay",
+    "fetch",
+    "latency",
+    "loading",
+    "mock",
+    "network",
+    "testing",
+    "timeout"
+  ],
+  "homepage": "https://github.com/junjuny0227/waitkit/tree/main/packages/core#readme",
   "bugs": {
     "url": "https://github.com/junjuny0227/waitkit/issues"
   },
-  "keywords": [
-    "fetch",
-    "network",
-    "latency",
-    "loading",
-    "timeout",
-    "testing"
-  ],
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    }
+  "license": "Apache-2.0",
+  "author": "junjuny0227",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/junjuny0227/waitkit.git",
+    "directory": "packages/core"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "dev": "tsup --watch",
-    "build": "tsup",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc"
   },
   "devDependencies": {
-    "@waitkit/eslint-config": "workspace:*",
+    "@arethetypeswrong/core": "^0.18.5",
     "@waitkit/typescript-config": "workspace:*",
-    "eslint": "^9.39.4",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.6"
+    "publint": "^0.3.25",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }

@@ -1,17 +1,11 @@
-import {
-  resolveDelay,
-  shouldTrigger,
-  sleep,
-  validateDelay,
-  validateRate,
-  validateTimeoutMs,
-} from './delay';
-import { WaitKitTimeoutError } from './errors';
-import { getRequestMethod, getRequestUrl, matchesRule } from './matcher';
-import { createErrorResponse } from './response';
+import { validateConfig } from './config';
+import { WaitKitConfigError } from './errors';
+import { normalizeRequest, selectRule } from './matcher';
+import { applyOutcome, resolveOutcome } from './outcome';
 import type {
+  WaitKitChangeReason,
+  WaitKitConfig,
   WaitKitController,
-  WaitKitErrorEvent,
   WaitKitEventListener,
   WaitKitEventMap,
   WaitKitEventType,
@@ -19,264 +13,186 @@ import type {
   WaitKitOptions,
   WaitKitRequestEvent,
   WaitKitRule,
-  WaitKitScenarioChangeReason,
+  WaitKitState,
 } from './types';
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+/** Shared across bundles so a second copy of the package still sees the active controller. */
+const ACTIVE_CONTROLLER = Symbol.for('waitkit.activeController');
 
-export function setupWaitKit(options: WaitKitOptions): WaitKitController {
-  validateRuntime();
-  validateOptions(options);
+type GlobalWithController = typeof globalThis & {
+  [ACTIVE_CONTROLLER]?: WaitKitController;
+};
 
+/**
+ * Patches `globalThis.fetch` so matching requests are delayed, fail, or time out.
+ *
+ * Only one controller is active at a time: calling this again (for example after a hot
+ * module reload) disposes the previous controller first.
+ */
+export function setupWaitKit(
+  config: WaitKitConfig = {},
+  options: WaitKitOptions = {},
+): WaitKitController {
+  if (typeof globalThis.fetch !== 'function' || typeof globalThis.Response !== 'function') {
+    throw new Error('WaitKit requires globalThis.fetch and globalThis.Response.');
+  }
+
+  const issues = validateConfig(config);
+  if (issues.length > 0) {
+    throw new WaitKitConfigError(issues);
+  }
+
+  const host = globalThis as GlobalWithController;
+  host[ACTIVE_CONTROLLER]?.dispose();
+
+  const random = options.random ?? Math.random;
+  const scenarios = Object.freeze(Object.keys(config.scenarios ?? {}));
+  const listeners: { [K in WaitKitEventType]: Set<WaitKitEventListener<K>> } = {
+    request: new Set(),
+    match: new Set(),
+    delayStart: new Set(),
+    delayEnd: new Set(),
+    error: new Set(),
+    change: new Set(),
+  };
   const originalFetch = globalThis.fetch;
-  const scenarioNamesCache = Object.keys(options.scenarios ?? {});
-  let enabled = options.enabled ?? true;
-  let activeScenario = options.activeScenario;
-  let restored = false;
+  let state: WaitKitState = Object.freeze({
+    enabled: options.enabled ?? true,
+    scenario: config.scenario,
+    disposed: false,
+  });
 
-  const listenersMap = new Map<WaitKitEventType, Set<WaitKitEventListener<WaitKitEventType>>>();
+  function emit<K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]): void {
+    for (const listener of listeners[type]) {
+      listener(event);
+    }
+  }
 
-  function dispatch<K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]): void {
-    for (const fn of listenersMap.get(type) ?? []) {
-      (fn as WaitKitEventListener<K>)(event);
+  function update(patch: Partial<WaitKitState>, reason: WaitKitChangeReason): void {
+    const previous = state;
+    const next = { ...state, ...patch };
+
+    if (
+      next.enabled === previous.enabled &&
+      next.scenario === previous.scenario &&
+      next.disposed === previous.disposed
+    ) {
+      return;
+    }
+
+    state = Object.freeze(next);
+    emit('change', { previous, current: state, reason });
+  }
+
+  function assertActive(action: string): void {
+    if (state.disposed) {
+      throw new Error(
+        `WaitKit controller was disposed; cannot ${action}. Call setupWaitKit again.`,
+      );
+    }
+  }
+
+  function activeRules(): readonly WaitKitRule[] {
+    return state.scenario === undefined
+      ? (config.rules ?? [])
+      : (config.scenarios?.[state.scenario] ?? []);
+  }
+
+  function debug(message: string): void {
+    if (options.debug === true) {
+      console.info(`[waitkit] ${message}`);
     }
   }
 
   const patchedFetch: typeof fetch = async (input, init) => {
-    if (!enabled) {
+    if (!state.enabled) {
       return originalFetch.call(globalThis, input, init);
     }
 
-    const requestEvent = createRequestEvent(input, init);
-    options.onRequest?.(requestEvent);
-    dispatch('request', requestEvent);
+    const request = normalizeRequest(input, init);
+    const requestEvent: WaitKitRequestEvent = {
+      url: request.url.href,
+      method: request.method,
+      input,
+      init,
+    };
+    emit('request', requestEvent);
 
-    const rule = findMatchingRule(getActiveRules(), requestEvent.url, requestEvent.method);
-
+    const rule = selectRule(activeRules(), request);
     if (rule === undefined) {
       return originalFetch.call(globalThis, input, init);
     }
 
-    const delayMs = resolveDelay(rule.delay);
-    const matchEvent = createMatchEvent(requestEvent, rule, activeScenario, delayMs);
-    options.onMatch?.(matchEvent);
-    dispatch('match', matchEvent);
+    const outcome = resolveOutcome(rule, { random });
+    const matchEvent: WaitKitMatchEvent = {
+      ...requestEvent,
+      rule,
+      scenario: state.scenario,
+      outcome,
+    };
+    emit('match', matchEvent);
+    debug(`${request.method} ${request.url.href} → ${outcome.kind} (+${outcome.delayMs}ms)`);
 
-    if (delayMs > 0) {
-      options.onDelayStart?.(matchEvent);
-      dispatch('delayStart', matchEvent);
-      debug(options, `${requestEvent.method} ${requestEvent.url} delayed by ${delayMs}ms`);
-      await sleep(delayMs);
-      options.onDelayEnd?.(matchEvent);
-      dispatch('delayEnd', matchEvent);
-    }
-
-    if (shouldTrigger(rule.timeoutRate)) {
-      const timeoutMs = rule.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-      const error = new WaitKitTimeoutError(
-        `WaitKit timed out ${requestEvent.method} ${requestEvent.url} after ${timeoutMs}ms.`,
-      );
-      emitError(options, dispatch, matchEvent, error);
-      debug(options, `${requestEvent.method} ${requestEvent.url} timed out after ${timeoutMs}ms`);
-      await sleep(timeoutMs);
-      throw error;
-    }
-
-    if (shouldTrigger(rule.errorRate)) {
-      const response = createErrorResponse(rule.errorResponse);
-      const error = new Error(
-        `WaitKit simulated ${response.status} response for ${requestEvent.method} ${requestEvent.url}.`,
-      );
-      emitError(options, dispatch, matchEvent, error);
-      debug(options, `${requestEvent.method} ${requestEvent.url} returned ${response.status}`);
-      return response;
-    }
-
-    return originalFetch.call(globalThis, input, init);
+    return applyOutcome(outcome, {
+      request: { method: request.method, url: request.url.href },
+      signal: init?.signal ?? (input instanceof Request ? input.signal : undefined),
+      passthrough: () => originalFetch.call(globalThis, input, init),
+      onDelayStart: () => emit('delayStart', matchEvent),
+      onDelayEnd: () => emit('delayEnd', matchEvent),
+      onError: (error) => emit('error', { ...matchEvent, error }),
+    });
   };
 
   globalThis.fetch = patchedFetch;
 
-  function getActiveRules(): readonly WaitKitRule[] {
-    if (activeScenario === undefined) {
-      return options.rules ?? [];
-    }
-
-    return options.scenarios?.[activeScenario] ?? [];
-  }
-
-  return {
+  const controller: WaitKitController = {
+    scenarios,
+    getState: () => state,
     enable() {
-      enabled = true;
-
-      if (restored) {
-        globalThis.fetch = patchedFetch;
-        restored = false;
-      }
+      assertActive('enable');
+      update({ enabled: true }, 'enable');
     },
     disable() {
-      enabled = false;
+      assertActive('disable');
+      update({ enabled: false }, 'disable');
     },
-    restore() {
+    setScenario(name) {
+      assertActive('set a scenario');
+      if (!scenarios.includes(name)) {
+        throw new Error(
+          `WaitKit scenario "${name}" does not exist. Known scenarios: ${scenarios.join(', ') || '(none)'}.`,
+        );
+      }
+      update({ scenario: name }, 'setScenario');
+    },
+    resetScenario() {
+      assertActive('reset the scenario');
+      update({ scenario: undefined }, 'resetScenario');
+    },
+    dispose() {
+      if (state.disposed) return;
+
+      // If something patched fetch after us, leave it in place; our patch becomes a passthrough.
       if (globalThis.fetch === patchedFetch) {
         globalThis.fetch = originalFetch;
       }
-
-      enabled = false;
-      restored = true;
-    },
-    isEnabled() {
-      return enabled;
-    },
-    setScenario(name: string) {
-      if (options.scenarios?.[name] === undefined) {
-        throw new Error(`WaitKit scenario "${name}" does not exist.`);
+      if (host[ACTIVE_CONTROLLER] === controller) {
+        delete host[ACTIVE_CONTROLLER];
       }
 
-      if (activeScenario === name) {
-        return;
-      }
-
-      const previousScenario = activeScenario;
-      activeScenario = name;
-      emitScenarioChange(options, dispatch, previousScenario, activeScenario, 'setScenario');
+      update({ enabled: false, disposed: true }, 'dispose');
+      for (const set of Object.values(listeners)) set.clear();
     },
-    getScenario() {
-      return activeScenario;
-    },
-    resetScenario() {
-      if (activeScenario === undefined) {
-        return;
-      }
-
-      const previousScenario = activeScenario;
-      activeScenario = undefined;
-      emitScenarioChange(options, dispatch, previousScenario, activeScenario, 'resetScenario');
-    },
-    getScenarioNames() {
-      return scenarioNamesCache;
-    },
-    addEventListener<K extends WaitKitEventType>(type: K, listener: WaitKitEventListener<K>) {
-      if (!listenersMap.has(type)) {
-        listenersMap.set(type, new Set());
-      }
-
-      listenersMap.get(type)!.add(listener as WaitKitEventListener<WaitKitEventType>);
+    on(type, listener) {
+      const set = listeners[type];
+      set.add(listener);
 
       return () => {
-        listenersMap.get(type)?.delete(listener as WaitKitEventListener<WaitKitEventType>);
+        set.delete(listener);
       };
     },
   };
-}
 
-function validateRuntime(): void {
-  if (typeof globalThis.fetch !== 'function') {
-    throw new Error('WaitKit requires globalThis.fetch.');
-  }
-
-  if (typeof Response !== 'function') {
-    throw new Error('WaitKit requires globalThis.Response.');
-  }
-}
-
-function validateOptions(options: WaitKitOptions): void {
-  validateRules(options.rules ?? []);
-
-  if (options.scenarios !== undefined) {
-    for (const rules of Object.values(options.scenarios)) {
-      validateRules(rules);
-    }
-  }
-
-  if (
-    options.activeScenario !== undefined &&
-    options.scenarios?.[options.activeScenario] === undefined
-  ) {
-    throw new Error(`WaitKit scenario "${options.activeScenario}" does not exist.`);
-  }
-}
-
-function validateRules(rules: readonly WaitKitRule[]): void {
-  for (const rule of rules) {
-    validateDelay(rule.delay);
-    validateRate(rule.errorRate, 'errorRate');
-    validateRate(rule.timeoutRate, 'timeoutRate');
-    validateTimeoutMs(rule.timeoutMs);
-    validateStatus(rule.errorResponse?.status);
-  }
-}
-
-function validateStatus(status: number | undefined): void {
-  if (status === undefined) {
-    return;
-  }
-
-  if (!Number.isInteger(status) || status < 200 || status > 599) {
-    throw new Error('WaitKit errorResponse.status must be an integer between 200 and 599.');
-  }
-}
-
-function createRequestEvent(input: RequestInfo | URL, init?: RequestInit): WaitKitRequestEvent {
-  return {
-    input,
-    init,
-    url: getRequestUrl(input),
-    method: getRequestMethod(input, init),
-  };
-}
-
-function createMatchEvent(
-  requestEvent: WaitKitRequestEvent,
-  rule: WaitKitRule,
-  scenario: string | undefined,
-  delayMs: number,
-): WaitKitMatchEvent {
-  return {
-    ...requestEvent,
-    rule,
-    scenario,
-    delayMs,
-  };
-}
-
-function findMatchingRule(
-  rules: readonly WaitKitRule[],
-  url: string,
-  method: string,
-): WaitKitRule | undefined {
-  return rules.find((rule) => matchesRule(rule, url, method));
-}
-
-function emitError(
-  options: WaitKitOptions,
-  dispatch: <K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]) => void,
-  matchEvent: WaitKitMatchEvent,
-  error: Error,
-): void {
-  const errorEvent: WaitKitErrorEvent = {
-    ...matchEvent,
-    error,
-  };
-
-  options.onError?.(errorEvent);
-  dispatch('error', errorEvent);
-}
-
-function emitScenarioChange(
-  options: WaitKitOptions,
-  dispatch: <K extends WaitKitEventType>(type: K, event: WaitKitEventMap[K]) => void,
-  previousScenario: string | undefined,
-  scenario: string | undefined,
-  reason: WaitKitScenarioChangeReason,
-): void {
-  const event = { previousScenario, scenario, reason };
-  options.onScenarioChange?.(event);
-  dispatch('scenarioChange', event);
-}
-
-function debug(options: WaitKitOptions, message: string): void {
-  if (options.debug === true) {
-    console.info(`[waitkit] ${message}`);
-  }
+  host[ACTIVE_CONTROLLER] = controller;
+  return controller;
 }

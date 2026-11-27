@@ -1,78 +1,119 @@
 export type DelayValue = number | readonly [min: number, max: number];
 
-/**
- * string: URL에 해당 문자열이 포함되면 매칭 (substring match).
- * 정확한 경로나 패턴 제어는 RegExp 또는 함수를 사용.
- */
-export type UrlMatcher = string | RegExp | ((url: string) => boolean);
-
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 
-export interface WaitKitErrorResponse {
+/**
+ * Decides which requests a rule applies to.
+ *
+ * - `string`: a path pattern matched against the whole pathname. `:name` matches one
+ *   segment and `*` matches the rest, e.g. `'/api/users/:id'` or `'/api/*'`. Patterns that
+ *   start with a scheme (`'https://api.example.com/*'`) also match the origin. The query
+ *   string is ignored and a trailing slash is optional.
+ * - `RegExp`: tested against the absolute URL (`url.href`).
+ * - function: receives the parsed absolute URL.
+ */
+export type UrlMatcher = string | RegExp | ((url: URL) => boolean);
+
+/** Returns a simulated error response instead of calling the network. */
+export interface WaitKitErrorEffect {
+  /** Probability between 0 and 1. Defaults to 1. */
+  rate?: number;
+  /** Defaults to 500. */
   status?: number;
   statusText?: string;
   headers?: HeadersInit;
+  /** Plain objects and arrays are sent as JSON. Strings and binary bodies are sent as-is. */
   body?: unknown;
 }
 
-export interface WaitKitRule {
-  url: UrlMatcher;
-  method?: HttpMethod | readonly HttpMethod[];
+/** Waits `ms` and then rejects with a `WaitKitTimeoutError`. */
+export interface WaitKitTimeoutEffect {
+  /** Probability between 0 and 1. Defaults to 1. */
+  rate?: number;
+  /** Defaults to 30 000. */
+  ms?: number;
+}
+
+/** What happens to a matched request. Applied in order: delay, timeout, error. */
+export interface WaitKitEffects {
   delay?: DelayValue;
-  errorRate?: number;
-  timeoutRate?: number;
-  timeoutMs?: number;
-  errorResponse?: WaitKitErrorResponse;
+  timeout?: WaitKitTimeoutEffect;
+  error?: WaitKitErrorEffect;
+}
+
+export interface WaitKitRule extends WaitKitEffects {
+  url: UrlMatcher;
+  /** Matches every method when omitted. */
+  method?: HttpMethod | readonly HttpMethod[];
+}
+
+export interface WaitKitConfig {
+  /** Rules used while no scenario is active. */
+  rules?: readonly WaitKitRule[];
+  /** Named rule sets. An active scenario replaces `rules`; the two are never merged. */
+  scenarios?: Readonly<Record<string, readonly WaitKitRule[]>>;
+  /** Scenario active at startup. */
+  scenario?: string;
+}
+
+export interface WaitKitOptions {
+  /** Defaults to true. Gate this on your environment, e.g. `import.meta.env.DEV`. */
+  enabled?: boolean;
+  /** Random source for delay ranges and rates. Defaults to `Math.random`. */
+  random?: () => number;
+  /** Logs every simulated request with `console.info`. */
+  debug?: boolean;
+}
+
+export type WaitKitOutcome =
+  | { kind: 'passthrough'; delayMs: number }
+  | { kind: 'error'; delayMs: number; response: Response }
+  | { kind: 'timeout'; delayMs: number; timeoutMs: number };
+
+export interface WaitKitState {
+  enabled: boolean;
+  scenario: string | undefined;
+  disposed: boolean;
 }
 
 export interface WaitKitRequestEvent {
-  input: RequestInfo | URL;
-  init?: RequestInit;
+  /** Absolute URL of the request. */
   url: string;
   method: string;
+  input: RequestInfo | URL;
+  init: RequestInit | undefined;
 }
 
 export interface WaitKitMatchEvent extends WaitKitRequestEvent {
   rule: WaitKitRule;
-  scenario?: string;
-  delayMs: number;
+  scenario: string | undefined;
+  outcome: WaitKitOutcome;
 }
-
-export type WaitKitDelayEvent = WaitKitMatchEvent;
 
 export interface WaitKitErrorEvent extends WaitKitMatchEvent {
   error: Error;
 }
 
-export type WaitKitScenarioChangeReason = 'setScenario' | 'resetScenario';
+export type WaitKitChangeReason =
+  | 'enable'
+  | 'disable'
+  | 'setScenario'
+  | 'resetScenario'
+  | 'dispose';
 
-export interface WaitKitScenarioChangeEvent {
-  previousScenario?: string;
-  scenario?: string;
-  reason: WaitKitScenarioChangeReason;
-}
-
-export interface WaitKitOptions {
-  enabled?: boolean;
-  rules?: readonly WaitKitRule[];
-  scenarios?: Record<string, readonly WaitKitRule[]>;
-  activeScenario?: string;
-  debug?: boolean;
-  onRequest?: (event: WaitKitRequestEvent) => void;
-  onMatch?: (event: WaitKitMatchEvent) => void;
-  onDelayStart?: (event: WaitKitDelayEvent) => void;
-  onDelayEnd?: (event: WaitKitDelayEvent) => void;
-  onError?: (event: WaitKitErrorEvent) => void;
-  onScenarioChange?: (event: WaitKitScenarioChangeEvent) => void;
+export interface WaitKitChangeEvent {
+  previous: WaitKitState;
+  current: WaitKitState;
+  reason: WaitKitChangeReason;
 }
 
 export interface WaitKitEventMap {
   request: WaitKitRequestEvent;
   match: WaitKitMatchEvent;
-  delayStart: WaitKitDelayEvent;
-  delayEnd: WaitKitDelayEvent;
+  delayStart: WaitKitMatchEvent;
+  delayEnd: WaitKitMatchEvent;
   error: WaitKitErrorEvent;
-  scenarioChange: WaitKitScenarioChangeEvent;
+  change: WaitKitChangeEvent;
 }
 
 export type WaitKitEventType = keyof WaitKitEventMap;
@@ -80,16 +121,21 @@ export type WaitKitEventType = keyof WaitKitEventMap;
 export type WaitKitEventListener<K extends WaitKitEventType> = (event: WaitKitEventMap[K]) => void;
 
 export interface WaitKitController {
+  /** Scenario names in declaration order. */
+  readonly scenarios: readonly string[];
+  /** Current state. The same object is returned until the state changes. */
+  getState: () => WaitKitState;
   enable: () => void;
   disable: () => void;
-  restore: () => void;
-  isEnabled: () => boolean;
   setScenario: (name: string) => void;
-  getScenario: () => string | undefined;
   resetScenario: () => void;
-  getScenarioNames: () => readonly string[];
-  addEventListener: <K extends WaitKitEventType>(
-    type: K,
-    listener: WaitKitEventListener<K>,
-  ) => () => void;
+  /** Restores the original fetch. A disposed controller cannot be re-enabled. */
+  dispose: () => void;
+  on: <K extends WaitKitEventType>(type: K, listener: WaitKitEventListener<K>) => () => void;
+}
+
+export interface WaitKitValidationIssue {
+  /** Location in the config, e.g. `scenarios.slow[0].error.rate`. */
+  path: string;
+  message: string;
 }

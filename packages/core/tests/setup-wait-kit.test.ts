@@ -1,567 +1,303 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setupWaitKit, WaitKitTimeoutError } from '../src';
+import type { WaitKitController, WaitKitEventMap } from '../src';
+import { setupWaitKit, WaitKitConfigError, WaitKitTimeoutError } from '../src';
 
-const nativeFetch = globalThis.fetch;
+const realFetch = globalThis.fetch;
+let networkFetch: ReturnType<typeof vi.fn<typeof fetch>>;
+let controller: WaitKitController | undefined;
 
-afterEach(() => {
-  globalThis.fetch = nativeFetch;
-  vi.useRealTimers();
-  vi.restoreAllMocks();
+beforeEach(() => {
+  networkFetch = vi.fn<typeof fetch>(async () => new Response('network', { status: 200 }));
+  globalThis.fetch = networkFetch;
 });
 
+afterEach(() => {
+  controller?.dispose();
+  controller = undefined;
+  globalThis.fetch = realFetch;
+  vi.useRealTimers();
+});
+
+function setup(...args: Parameters<typeof setupWaitKit>): WaitKitController {
+  controller = setupWaitKit(...args);
+  return controller;
+}
+
+function record<K extends keyof WaitKitEventMap>(c: WaitKitController, type: K) {
+  const events: WaitKitEventMap[K][] = [];
+  c.on(type, (event) => events.push(event));
+  return events;
+}
+
 describe('setupWaitKit', () => {
-  it('passes unmatched requests through to the original fetch', async () => {
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
+  it('throws a WaitKitConfigError listing every issue', () => {
+    let thrown: unknown;
+    try {
+      setupWaitKit({ rules: [{ url: '', delay: -1 }] });
+    } catch (error) {
+      thrown = error;
+    }
 
-    setupWaitKit({
-      rules: [{ url: '/api/users', delay: 1000 }],
-    });
-
-    await fetch('/api/posts');
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(thrown).toBeInstanceOf(WaitKitConfigError);
+    expect((thrown as WaitKitConfigError).issues.map((issue) => issue.path)).toEqual([
+      'rules[0].url',
+      'rules[0].delay',
+    ]);
+    expect((thrown as Error).message).toContain('rules[0].url: must not be empty');
   });
 
-  it('delays matched requests before calling the original fetch', async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [{ url: '/api/users', delay: 1000 }],
-    });
-
-    const promise = fetch('/api/users');
-
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(1000);
-    await promise;
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  it('does not patch fetch when the config is invalid', () => {
+    expect(() => setupWaitKit({ rules: [{ url: '/a', delay: -1 }] })).toThrow(
+      'Invalid Waitkit config',
+    );
+    expect(globalThis.fetch).toBe(networkFetch);
   });
 
-  it('returns simulated error responses', async () => {
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
+  it('passes unmatched requests to the original fetch with the same arguments', async () => {
+    setup({ rules: [{ url: '/api/users', error: {} }] });
+    const init = { method: 'POST', body: 'x' };
 
-    setupWaitKit({
-      rules: [
-        {
-          url: '/api/payment',
-          errorRate: 1,
-          errorResponse: {
-            status: 503,
-            body: { message: 'Unavailable' },
-          },
-        },
-      ],
-    });
+    const response = await fetch('/api/posts', init);
 
-    const response = await fetch('/api/payment');
-
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: 'Unavailable' });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await response.text()).toBe('network');
+    expect(networkFetch).toHaveBeenCalledWith('/api/posts', init);
   });
 
-  it('uses errorRate as a probability threshold', async () => {
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [
-        {
-          url: '/api/payment',
-          errorRate: 0.5,
-          errorResponse: { status: 503 },
-        },
-      ],
-    });
-
-    expect((await fetch('/api/payment')).status).toBe(503);
-    expect((await fetch('/api/payment')).status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('throws timeout errors after timeoutMs', async () => {
-    vi.useFakeTimers();
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [{ url: '/api/report', timeoutRate: 1, timeoutMs: 5000 }],
-    });
-
-    const promise = fetch('/api/report');
-    const expectation = expect(promise).rejects.toBeInstanceOf(WaitKitTimeoutError);
-    await vi.advanceTimersByTimeAsync(5000);
-
-    await expectation;
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('waits for delay before starting timeout simulation', async () => {
-    vi.useFakeTimers();
-    const onError = vi.fn();
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [{ url: '/api/report', delay: 500, timeoutRate: 1, timeoutMs: 1000 }],
-      onError,
-    });
-
-    const promise = fetch('/api/report');
-    const expectation = expect(promise).rejects.toBeInstanceOf(WaitKitTimeoutError);
-
-    await vi.advanceTimersByTimeAsync(499);
-    expect(onError).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(onError).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(1000);
-    await expectation;
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('uses timeoutRate as a probability threshold', async () => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [{ url: '/api/report', timeoutRate: 0.5, timeoutMs: 1000 }],
-    });
-
-    const timeoutPromise = fetch('/api/report');
-    const expectation = expect(timeoutPromise).rejects.toBeInstanceOf(WaitKitTimeoutError);
-    await vi.advanceTimersByTimeAsync(1000);
-    await expectation;
-
-    expect((await fetch('/api/report')).status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not cancel simulated delay when the request signal aborts', async () => {
-    vi.useFakeTimers();
-    const abortController = new AbortController();
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [{ url: '/api/users', delay: 100 }],
-    });
-
-    const promise = fetch('/api/users', { signal: abortController.signal });
-    abortController.abort();
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    await expect(promise).resolves.toHaveProperty('status', 200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('applies the first matching rule when multiple rules match', async () => {
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    setupWaitKit({
-      rules: [
-        {
-          url: '/api/users',
-          errorRate: 1,
-          errorResponse: { status: 503 },
-        },
-        {
-          url: '/api',
-          errorRate: 1,
-          errorResponse: { status: 418 },
-        },
-      ],
-    });
+  it('returns the simulated error response without calling the network', async () => {
+    setup({ rules: [{ url: '/api/users', error: { status: 503, body: { message: 'down' } } }] });
 
     const response = await fetch('/api/users');
 
     expect(response.status).toBe(503);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({ message: 'down' });
+    expect(networkFetch).not.toHaveBeenCalled();
   });
 
-  it('can disable, enable, and restore the interceptor', async () => {
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    const controller = setupWaitKit({
-      rules: [
-        {
-          url: '/api/users',
-          errorRate: 1,
-          errorResponse: { status: 500 },
-        },
-      ],
-    });
-
-    controller.disable();
-    const disabledResponse = await fetch('/api/users');
-    expect(disabledResponse.status).toBe(200);
-
-    controller.enable();
-    const enabledResponse = await fetch('/api/users');
-    expect(enabledResponse.status).toBe(500);
-
-    controller.restore();
-    expect(globalThis.fetch).toBe(fetchMock);
-  });
-
-  it('can enable the interceptor again after restore', async () => {
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    const controller = setupWaitKit({
-      rules: [
-        {
-          url: '/api/users',
-          errorRate: 1,
-          errorResponse: { status: 500 },
-        },
-      ],
-    });
-
-    controller.restore();
-    expect((await fetch('/api/users')).status).toBe(200);
-
-    controller.enable();
-    expect((await fetch('/api/users')).status).toBe(500);
-  });
-
-  it('switches scenarios at runtime', async () => {
-    const fetchMock = vi.fn(async () => new Response('ok'));
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    const controller = setupWaitKit({
-      activeScenario: 'server-error',
-      rules: [
-        {
-          url: '/api/users',
-          errorRate: 1,
-          errorResponse: { status: 400 },
-        },
-      ],
-      scenarios: {
-        'server-error': [
-          {
-            url: '/api/users',
-            errorRate: 1,
-            errorResponse: { status: 500 },
-          },
-        ],
-      },
-    });
-
-    expect((await fetch('/api/users')).status).toBe(500);
-
-    controller.resetScenario();
-    expect((await fetch('/api/users')).status).toBe(400);
-
-    controller.setScenario('server-error');
-    expect(controller.getScenario()).toBe('server-error');
-  });
-
-  it('emits scenario change events when scenarios change at runtime', () => {
-    const onScenarioChange = vi.fn();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    const controller = setupWaitKit({
-      activeScenario: 'server-error',
-      scenarios: {
-        'server-error': [{ url: '/api/users', errorRate: 1 }],
-        'slow-network': [{ url: '/api/users', delay: 1000 }],
-      },
-      onScenarioChange,
-    });
-
-    expect(onScenarioChange).not.toHaveBeenCalled();
-
-    controller.setScenario('slow-network');
-    expect(onScenarioChange).toHaveBeenCalledWith({
-      previousScenario: 'server-error',
-      scenario: 'slow-network',
-      reason: 'setScenario',
-    });
-
-    controller.resetScenario();
-    expect(onScenarioChange).toHaveBeenLastCalledWith({
-      previousScenario: 'slow-network',
-      scenario: undefined,
-      reason: 'resetScenario',
-    });
-    expect(onScenarioChange).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not emit scenario change events for scenario no-ops', () => {
-    const onScenarioChange = vi.fn();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    const controller = setupWaitKit({
-      activeScenario: 'server-error',
-      scenarios: {
-        'server-error': [{ url: '/api/users', errorRate: 1 }],
-      },
-      onScenarioChange,
-    });
-
-    controller.setScenario('server-error');
-    expect(onScenarioChange).not.toHaveBeenCalled();
-
-    controller.resetScenario();
-    expect(onScenarioChange).toHaveBeenCalledTimes(1);
-
-    controller.resetScenario();
-    expect(onScenarioChange).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not emit scenario change events when setScenario fails', () => {
-    const onScenarioChange = vi.fn();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    const controller = setupWaitKit({
-      scenarios: {
-        'server-error': [{ url: '/api/users', errorRate: 1 }],
-      },
-      onScenarioChange,
-    });
-
-    expect(() => controller.setScenario('missing')).toThrow(
-      'WaitKit scenario "missing" does not exist.',
-    );
-    expect(onScenarioChange).not.toHaveBeenCalled();
-  });
-
-  it('emits request, match, delay, and error events', async () => {
+  it('delays matched requests and then calls the network', async () => {
     vi.useFakeTimers();
-    const onRequest = vi.fn();
-    const onMatch = vi.fn();
-    const onDelayStart = vi.fn();
-    const onDelayEnd = vi.fn();
-    const onError = vi.fn();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    setupWaitKit({
-      rules: [
-        {
-          url: '/api/users',
-          delay: 100,
-          errorRate: 1,
-          errorResponse: { status: 500 },
-        },
-      ],
-      onRequest,
-      onMatch,
-      onDelayStart,
-      onDelayEnd,
-      onError,
-    });
+    setup({ rules: [{ url: '/api/*', delay: 500 }] });
 
     const promise = fetch('/api/users');
-    await vi.advanceTimersByTimeAsync(100);
-    await promise;
+    await vi.advanceTimersByTimeAsync(499);
+    expect(networkFetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
 
-    expect(onRequest).toHaveBeenCalledTimes(1);
-    expect(onMatch).toHaveBeenCalledTimes(1);
-    expect(onDelayStart).toHaveBeenCalledTimes(1);
-    expect(onDelayEnd).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledTimes(1);
+    expect((await promise).status).toBe(200);
   });
 
-  it('includes debugging context in error events', async () => {
-    const onError = vi.fn();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+  it('rejects with WaitKitTimeoutError after the timeout', async () => {
+    vi.useFakeTimers();
+    setup({ rules: [{ url: '/api/*', timeout: { ms: 3000 } }] });
 
-    setupWaitKit({
-      activeScenario: 'server-error',
-      scenarios: {
-        'server-error': [
-          {
-            url: '/api/users',
-            delay: 25,
-            errorRate: 1,
-            errorResponse: { status: 500 },
-          },
-        ],
-      },
-      onError,
-    });
+    const promise = fetch('/api/users');
+    promise.catch(() => {}); // asserted below, after the timers run
+    await vi.advanceTimersByTimeAsync(3000);
+    await expect(promise).rejects.toBeInstanceOf(WaitKitTimeoutError);
+    expect(networkFetch).not.toHaveBeenCalled();
+  });
 
-    await fetch('/api/users');
+  it('rejects with the abort reason when the request is aborted while waiting', async () => {
+    vi.useFakeTimers();
+    setup({ rules: [{ url: '*', delay: 10_000 }] });
+    const abort = new AbortController();
 
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/api/users',
-        method: 'GET',
-        scenario: 'server-error',
-        delayMs: 25,
-        error: expect.any(Error),
-      }),
+    const promise = fetch('/api/users', { signal: abort.signal });
+    promise.catch(() => {}); // asserted below, after the timers run
+    abort.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+    expect(networkFetch).not.toHaveBeenCalled();
+  });
+
+  it('respects the signal of a Request input', async () => {
+    vi.useFakeTimers();
+    setup({ rules: [{ url: '*', timeout: {} }] });
+    const abort = new AbortController();
+
+    const promise = fetch(new Request('http://localhost/api', { signal: abort.signal }));
+    promise.catch(() => {}); // asserted below, after the timers run
+    abort.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('uses the injected random source', async () => {
+    setup({ rules: [{ url: '*', error: { rate: 0.5 } }] }, { random: () => 0.9 });
+    expect((await fetch('/a')).status).toBe(200);
+
+    setup({ rules: [{ url: '*', error: { rate: 0.5 } }] }, { random: () => 0.1 });
+    expect((await fetch('/a')).status).toBe(500);
+  });
+
+  it('logs simulated requests when debug is on', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    setup({ rules: [{ url: '*', error: { status: 502 } }] }, { debug: true });
+
+    await fetch('/api');
+
+    expect(info).toHaveBeenCalledWith('[waitkit] GET http://localhost/api → error (+0ms)');
+  });
+});
+
+describe('scenarios', () => {
+  const config = {
+    rules: [{ url: '/api/*', delay: 0, error: { status: 400 } }],
+    scenarios: {
+      broken: [{ url: '/api/*', error: { status: 500 } }],
+      offline: [{ url: '*', error: { status: 503 } }],
+    },
+  };
+
+  it('replaces the base rules while a scenario is active', async () => {
+    const c = setup(config);
+    expect((await fetch('/api/a')).status).toBe(400);
+
+    c.setScenario('broken');
+    expect((await fetch('/api/a')).status).toBe(500);
+
+    c.resetScenario();
+    expect((await fetch('/api/a')).status).toBe(400);
+  });
+
+  it('starts with config.scenario and lists scenario names in order', () => {
+    const c = setup({ ...config, scenario: 'offline' });
+    expect(c.getState().scenario).toBe('offline');
+    expect(c.scenarios).toEqual(['broken', 'offline']);
+  });
+
+  it('throws for an unknown scenario and names the known ones', () => {
+    const c = setup(config);
+    expect(() => c.setScenario('slow')).toThrow(
+      'WaitKit scenario "slow" does not exist. Known scenarios: broken, offline.',
     );
   });
 });
 
-describe('addEventListener', () => {
-  it('fires a match listener when a fetch matches a rule', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+describe('controller state and events', () => {
+  it('returns the same state object until something changes', () => {
+    const c = setup({});
+    const first = c.getState();
 
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', delay: 0 }],
-    });
-
-    const listener = vi.fn();
-    controller.addEventListener('match', listener);
-
-    await fetch('/api/users');
-
-    expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/api/users', method: 'GET', delayMs: 0 }),
-    );
+    expect(c.getState()).toBe(first);
+    c.enable();
+    expect(c.getState()).toBe(first);
+    c.disable();
+    expect(c.getState()).not.toBe(first);
+    expect(c.getState()).toEqual({ enabled: false, scenario: undefined, disposed: false });
   });
 
-  it('fires an error listener when a fetch triggers an error', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+  it('emits change events with previous and current state', () => {
+    const c = setup({ scenarios: { slow: [] } });
+    const changes = record(c, 'change');
 
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', errorRate: 1 }],
-    });
+    c.disable();
+    c.disable();
+    c.setScenario('slow');
+    c.resetScenario();
+    c.enable();
 
-    const listener = vi.fn();
-    controller.addEventListener('error', listener);
-
-    await fetch('/api/users');
-
-    expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/api/users', error: expect.any(Error) }),
-    );
+    expect(changes.map((event) => event.reason)).toEqual([
+      'disable',
+      'setScenario',
+      'resetScenario',
+      'enable',
+    ]);
+    expect(changes[1]?.previous.scenario).toBeUndefined();
+    expect(changes[1]?.current.scenario).toBe('slow');
   });
 
-  it('stops firing a listener after unsubscribe is called', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', delay: 0 }],
-    });
-
-    const listener = vi.fn();
-    const unsubscribe = controller.addEventListener('match', listener);
-
-    await fetch('/api/users');
-    expect(listener).toHaveBeenCalledOnce();
-
-    unsubscribe();
-    await fetch('/api/users');
-    expect(listener).toHaveBeenCalledOnce();
-  });
-
-  it('fires a scenarioChange listener when setScenario is called', () => {
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    const controller = setupWaitKit({
-      scenarios: {
-        slow: [{ url: '/api/users', delay: 500 }],
-        error: [{ url: '/api/users', errorRate: 1 }],
-      },
-    });
-
-    const listener = vi.fn();
-    controller.addEventListener('scenarioChange', listener);
-
-    controller.setScenario('slow');
-
-    expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith({
-      previousScenario: undefined,
-      scenario: 'slow',
-      reason: 'setScenario',
-    });
-  });
-
-  it('fires a request listener on every fetch', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
-
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', delay: 0 }],
-    });
-
-    const listener = vi.fn();
-    controller.addEventListener('request', listener);
-
-    await fetch('/api/users');
-
-    expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/api/users', method: 'GET' }),
-    );
-  });
-
-  it('fires a delayStart listener when a fetch is delayed', async () => {
+  it('emits request, match, delay, and error events in order', async () => {
     vi.useFakeTimers();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+    const c = setup({ rules: [{ url: '/api/*', delay: 100, error: { status: 500 } }] });
+    const order: string[] = [];
+    for (const type of ['request', 'match', 'delayStart', 'delayEnd', 'error'] as const) {
+      c.on(type, () => order.push(type));
+    }
+    const matches = record(c, 'match');
 
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', delay: 100 }],
-    });
-
-    const listener = vi.fn();
-    controller.addEventListener('delayStart', listener);
-
-    const promise = fetch('/api/users');
-    expect(listener).toHaveBeenCalledOnce();
-
+    const promise = fetch('/api/users', { method: 'post' });
     await vi.advanceTimersByTimeAsync(100);
     await promise;
+
+    expect(order).toEqual(['request', 'match', 'delayStart', 'delayEnd', 'error']);
+    expect(matches[0]).toMatchObject({
+      url: 'http://localhost/api/users',
+      method: 'POST',
+      scenario: undefined,
+      outcome: { kind: 'error', delayMs: 100 },
+    });
   });
 
-  it('fires a delayEnd listener after delay completes', async () => {
-    vi.useFakeTimers();
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+  it('emits only request for unmatched requests', async () => {
+    const c = setup({ rules: [{ url: '/api/*', error: {} }] });
+    const requests = record(c, 'request');
+    const matches = record(c, 'match');
 
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', delay: 100 }],
-    });
+    await fetch('/other');
 
+    expect(requests).toHaveLength(1);
+    expect(matches).toHaveLength(0);
+  });
+
+  it('stops delivering events after unsubscribe', async () => {
+    const c = setup({});
     const listener = vi.fn();
-    controller.addEventListener('delayEnd', listener);
+    const off = c.on('request', listener);
 
-    const promise = fetch('/api/users');
+    off();
+    await fetch('/a');
+
     expect(listener).not.toHaveBeenCalled();
+  });
+});
 
-    await vi.advanceTimersByTimeAsync(100);
-    await promise;
+describe('enable, disable, and dispose', () => {
+  it('bypasses rules while disabled', async () => {
+    const c = setup({ rules: [{ url: '*', error: {} }] }, { enabled: false });
+    const requests = record(c, 'request');
 
-    expect(listener).toHaveBeenCalledOnce();
+    expect((await fetch('/a')).status).toBe(200);
+    expect(requests).toHaveLength(0);
+
+    c.enable();
+    expect((await fetch('/a')).status).toBe(500);
   });
 
-  it('calls both the options callback and an addEventListener listener for the same event', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('ok')) as typeof fetch;
+  it('restores the original fetch and cannot be re-enabled', () => {
+    const c = setup({});
+    expect(globalThis.fetch).not.toBe(networkFetch);
 
-    const optionsListener = vi.fn();
-    const addedListener = vi.fn();
+    const changes = record(c, 'change');
+    c.dispose();
 
-    const controller = setupWaitKit({
-      rules: [{ url: '/api/users', delay: 0 }],
-      onMatch: optionsListener,
-    });
+    expect(globalThis.fetch).toBe(networkFetch);
+    expect(c.getState()).toEqual({ enabled: false, scenario: undefined, disposed: true });
+    expect(changes.map((event) => event.reason)).toEqual(['dispose']);
+    expect(() => c.enable()).toThrow('WaitKit controller was disposed');
+    expect(() => c.dispose()).not.toThrow();
+  });
 
-    controller.addEventListener('match', addedListener);
+  it('leaves a fetch patched by someone else in place on dispose', async () => {
+    const c = setup({ rules: [{ url: '*', error: {} }] });
+    const patched = globalThis.fetch;
+    const outer = vi.fn<typeof fetch>((input, init) => patched(input, init));
+    globalThis.fetch = outer;
 
-    await fetch('/api/users');
+    c.dispose();
 
-    expect(optionsListener).toHaveBeenCalledOnce();
-    expect(addedListener).toHaveBeenCalledOnce();
+    expect(globalThis.fetch).toBe(outer);
+    expect((await fetch('/a')).status).toBe(200);
+  });
+
+  it('disposes the previous controller when set up again', async () => {
+    const first = setup({ rules: [{ url: '*', error: { status: 500 } }] });
+    const second = setup({ rules: [{ url: '*', error: { status: 502 } }] });
+
+    expect(first.getState().disposed).toBe(true);
+    expect((await fetch('/a')).status).toBe(502);
+
+    second.dispose();
+    expect(globalThis.fetch).toBe(networkFetch);
   });
 });
