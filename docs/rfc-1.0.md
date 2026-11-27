@@ -153,7 +153,7 @@ const controller = setupWaitKit(config, { enabled: import.meta.env.DEV });
 ### D7. 랜덤 소스 주입 — 확정
 
 - `setupWaitKit(config, { random })`, `resolveOutcome(effects, { random })`. 기본 `Math.random`.
-- 근거: P10, `.claude/rules/core-api-conventions.md`의 "Random delay, error, and timeout behavior must be testable".
+- 근거: P10, 0.x 하네스 규칙(core-api-conventions)의 "Random delay, error, and timeout behavior must be testable".
 
 ### D8. AbortSignal 존중 — 확정
 

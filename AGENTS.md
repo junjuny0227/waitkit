@@ -9,7 +9,7 @@ Instructions for coding agents working in this repository. Claude Code reads thi
 
 Waitkit is a pnpm + Turborepo monorepo of development-only network simulation libraries:
 `packages/core`, `packages/react`, `packages/msw`, `packages/cli`, plus `apps/example` (Vite +
-React demo) and `packages/typescript-config` (shared tsconfig). The 1.0 design and the reasons
+React demo). Packages extend the root `tsconfig.base.json` by relative path. The 1.0 design and the reasons
 behind it are in `docs/rfc-1.0.md`; user-facing changes from 0.x are in `docs/migration-1.0.md`.
 
 ## Build and test
@@ -47,8 +47,40 @@ Set `TURBO_UI=stream` when capturing Turbo output: `turbo.json` uses the TUI, wh
   fixed function instead of spying on `Math.random`.
 - **Global state**: `setupWaitKit` patches `globalThis.fetch`; every change to that path needs a
   test that `dispose()` restores the original fetch.
+- **Dependency direction**: `core` has no runtime dependencies; `react`, `msw`, and `cli` depend
+  on it with `workspace:^`. If an adapter needs a default, check, or decision that core lacks,
+  add a core export first.
+- **MSW 2 and 3**: `packages/msw` imports MSW only with `import type` from the `msw` root.
+  `tests/msw2-compat.test.ts` type-checks against MSW 2 through the `msw2` alias; keep it passing.
 - **Public API changes** need a changeset, a README update in the package, and, if breaking, an
-  entry in `docs/migration-1.0.md` (or the next major's guide).
+  entry in `docs/migration-1.0.md` (or the next major's guide). Each package exports only from
+  `src/index.ts`; everything exported there is public and needs README coverage, and README
+  examples must use real exports.
+- **Manifests**: libraries ship ESM + CJS (`exports.import` → `./dist/index.js`,
+  `exports.require` → `./dist/index.cjs`, `types` → `./dist/index.d.cts`), `sideEffects: false`,
+  `files: ["dist", "LICENSE", "NOTICE"]`, `engines.node >=22.18.0`; the CLI ships ESM only.
+  Versions shared by several packages come from the `catalog:` in `pnpm-workspace.yaml`.
+
+## Core behavior contract
+
+These are promises to users; changing one is a breaking change. Every behavior change in core
+comes with a test in `packages/core/tests`, using `random` and fake timers.
+
+- Effects apply in the order delay → timeout → error → passthrough; the first matching rule
+  wins; an active scenario replaces `rules` instead of merging. Defaults: `rate` 1, `timeout.ms`
+  30000, `error.status` 500.
+- String `url` is a path pattern over the whole pathname (`:param` = one segment, `*` = the
+  rest, query ignored, trailing slash optional; a scheme also matches the origin). RegExp tests
+  `url.href`; functions get a `URL`.
+- `validateConfig` returns every issue with a path and never throws. Renamed or removed options
+  go into `REMOVED_KEYS` in `packages/core/src/config.ts` so the error names the replacement.
+- `resolveOutcome` is pure apart from the injected `random`. `applyOutcome` waits, emits through
+  callbacks, and rejects with `signal.reason` on abort. Timeout errors are `WaitKitTimeoutError`
+  with the message `WaitKit timed out <METHOD> <url> after <ms>ms.` (core and msw tests pin it).
+- `getState()` returns the same frozen object until something changes (React's
+  `useSyncExternalStore` relies on it); each real change emits one `change` event, no-ops emit
+  nothing. `dispose()` is final, restores `fetch` only if our patch is still installed, and
+  clears listeners; a new `setupWaitKit` disposes the previous controller.
 
 ## Generated and copied files
 
@@ -105,7 +137,11 @@ Never hand-edit these; change the source and regenerate.
 
 - Branches: `<type>/<kebab-case>` with type `feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
   or `ci`. Commits: Conventional Commits, scope when it helps (`core`, `react`, `msw`, `cli`,
-  `example`, `docs`, `release`, `tooling`, `ci`, `harness`). One logical change per commit.
+  `example`, `docs`, `release`, `tooling`, `ci`, `harness`). One logical change per commit; keep
+  source, formatting churn, release metadata, and agent-instruction edits in separate commits.
+- PRs follow `.github/PULL_REQUEST_TEMPLATE.md` (purpose, changes, gate commands actually run,
+  release impact, changeset). Reply to every review comment, including ones not applied, with
+  the reason.
 - Language: code, comments, npm-facing READMEs, `docs/`, and changesets in English. `ROADMAP.md`,
   PR titles and bodies, and review replies in Korean. Test titles in `packages/msw/tests` are
   Korean; the other packages use English — match the file.
