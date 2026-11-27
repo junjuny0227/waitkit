@@ -1,3 +1,6 @@
 {
-  "js/ts.tsdk.path": "node_modules/typescript/lib"
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnSave": true,
+  "oxc.typeAware": true,
+  "typescript.experimental.useTsgo": true
 }
