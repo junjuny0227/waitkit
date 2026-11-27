@@ -20,10 +20,14 @@ Done by the maintainer, not by agents or workflows.
    tags matching `v*`.
 2. npmjs.com, for each of the four packages: **Settings → Trusted publishing → GitHub
    Actions** with organization or user `junjuny0227`, repository `waitkit`, workflow filename
-   `publish.yml`, environment `npm`. The packages already exist on npm, which trusted
-   publishing requires. A new package must be published once by hand before it can be added.
-3. After the first successful OIDC publish, set each package's **Publishing access** to require
-   2FA and disallow tokens, so only the workflow can publish.
+   `publish.yml`, environment `npm`, and under **Allowed actions** tick **Allow npm publish**.
+   New configurations allow only `npm stage publish` by default, and `publish.yml` publishes
+   directly, so without the tick the publish step fails with `E403`. `npm dist-tag` is not
+   needed: the dist-tag is set by `--tag` at publish time. The packages already exist on npm,
+   which trusted publishing requires; a new package must be published once by hand first.
+3. **Publishing access**: choose **Require two-factor authentication and disallow tokens**.
+   Trusted publishers keep working under every option; this only stops long-lived tokens from
+   publishing. A manual `npm publish` with a 2FA code remains the fallback.
 
 ## Every release
 
