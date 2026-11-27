@@ -110,14 +110,17 @@ module reload, disposes the previous controller first.
 
 ### Events
 
-| Event        | When                                                                |
-| ------------ | ------------------------------------------------------------------- |
-| `request`    | Every request while enabled, matched or not                         |
-| `match`      | A rule matched; `event.outcome` says what will happen               |
-| `delayStart` | Before a delay                                                      |
-| `delayEnd`   | After a delay                                                       |
-| `error`      | Before a timeout starts waiting or a simulated error is returned    |
-| `change`     | `enabled`, `scenario`, or `disposed` changed (`previous`/`current`) |
+| Event        | When                                                                                   |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `request`    | Every request while enabled, matched or not                                            |
+| `match`      | A rule matched; `event.outcome` says what will happen                                  |
+| `delayStart` | Before a delay                                                                         |
+| `delayEnd`   | After a delay                                                                          |
+| `error`      | Before a timeout starts waiting or a simulated error is returned                       |
+| `settle`     | A simulated request ended: `result` is `passthrough`, `error`, `timeout`, or `aborted` |
+| `change`     | `enabled`, `scenario`, or `disposed` changed (`previous`/`current`)                    |
+
+Events for one simulated request (`match`, `delayStart`, `delayEnd`, `error`, `settle`) carry the same `id`.
 
 ## Options
 

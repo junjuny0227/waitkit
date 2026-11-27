@@ -229,6 +229,39 @@ describe('controller state and events', () => {
     });
   });
 
+  it('settles each simulated request exactly once with how it ended', async () => {
+    vi.useFakeTimers();
+    const c = setup({
+      rules: [
+        { url: '/pass', delay: 10 },
+        { url: '/fail', error: { status: 500 } },
+        { url: '/hang', timeout: { ms: 20 } },
+        { url: '/slow', delay: 1000 },
+      ],
+    });
+    const settles = record(c, 'settle');
+    const matches = record(c, 'match');
+    const abort = new AbortController();
+
+    const pass = fetch('/pass');
+    const fail = fetch('/fail');
+    const hang = fetch('/hang').catch(() => 'timed out');
+    const slow = fetch('/slow', { signal: abort.signal }).catch(() => 'aborted');
+    abort.abort();
+    await vi.advanceTimersByTimeAsync(20);
+    await Promise.all([pass, fail, hang, slow]);
+
+    expect(settles.map((event) => [new URL(event.url).pathname, event.result])).toEqual([
+      ['/fail', 'error'],
+      ['/slow', 'aborted'],
+      ['/pass', 'passthrough'],
+      ['/hang', 'timeout'],
+    ]);
+    const matchIds = new Set(matches.map((event) => event.id));
+    expect(matchIds.size).toBe(4);
+    expect(new Set(settles.map((event) => event.id))).toEqual(matchIds);
+  });
+
   it('emits only request for unmatched requests', async () => {
     const c = setup({ rules: [{ url: '/api/*', error: {} }] });
     const requests = record(c, 'request');

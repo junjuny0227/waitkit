@@ -1,5 +1,5 @@
 import { validateConfig } from './config';
-import { WaitKitConfigError } from './errors';
+import { WaitKitConfigError, WaitKitTimeoutError } from './errors';
 import { normalizeRequest, selectRule } from './matcher';
 import { applyOutcome, resolveOutcome } from './outcome';
 import type {
@@ -13,6 +13,7 @@ import type {
   WaitKitOptions,
   WaitKitRequestEvent,
   WaitKitRule,
+  WaitKitSettleResult,
   WaitKitState,
 } from './types';
 
@@ -53,8 +54,10 @@ export function setupWaitKit(
     delayStart: new Set(),
     delayEnd: new Set(),
     error: new Set(),
+    settle: new Set(),
     change: new Set(),
   };
+  let nextRequestId = 0;
   const originalFetch = globalThis.fetch;
   let state: WaitKitState = Object.freeze({
     enabled: options.enabled ?? true,
@@ -124,8 +127,10 @@ export function setupWaitKit(
     }
 
     const outcome = resolveOutcome(rule, { random });
+    nextRequestId += 1;
     const matchEvent: WaitKitMatchEvent = {
       ...requestEvent,
+      id: nextRequestId,
       rule,
       scenario: state.scenario,
       outcome,
@@ -133,14 +138,32 @@ export function setupWaitKit(
     emit('match', matchEvent);
     debug(`${request.method} ${request.url.href} → ${outcome.kind} (+${outcome.delayMs}ms)`);
 
-    return applyOutcome(outcome, {
-      request: { method: request.method, url: request.url.href },
-      signal: init?.signal ?? (input instanceof Request ? input.signal : undefined),
-      passthrough: () => originalFetch.call(globalThis, input, init),
-      onDelayStart: () => emit('delayStart', matchEvent),
-      onDelayEnd: () => emit('delayEnd', matchEvent),
-      onError: (error) => emit('error', { ...matchEvent, error }),
-    });
+    let settled = false;
+    const settle = (result: WaitKitSettleResult): void => {
+      if (settled) return;
+      settled = true;
+      emit('settle', { ...matchEvent, result });
+    };
+
+    try {
+      const response = await applyOutcome(outcome, {
+        request: { method: request.method, url: request.url.href },
+        signal: init?.signal ?? (input instanceof Request ? input.signal : undefined),
+        passthrough: () => {
+          settle('passthrough');
+          return originalFetch.call(globalThis, input, init);
+        },
+        onDelayStart: () => emit('delayStart', matchEvent),
+        onDelayEnd: () => emit('delayEnd', matchEvent),
+        onError: (error) => emit('error', { ...matchEvent, error }),
+      });
+      settle('error');
+      return response;
+    } catch (error) {
+      // A rejection from the real fetch arrives after `settle('passthrough')` and is ignored here.
+      settle(error instanceof WaitKitTimeoutError ? 'timeout' : 'aborted');
+      throw error;
+    }
   };
 
   globalThis.fetch = patchedFetch;

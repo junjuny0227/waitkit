@@ -85,6 +85,8 @@ export interface WaitKitRequestEvent {
 }
 
 export interface WaitKitMatchEvent extends WaitKitRequestEvent {
+  /** Identifies one simulated request across its match, delay, error, and settle events. */
+  id: number;
   rule: WaitKitRule;
   scenario: string | undefined;
   outcome: WaitKitOutcome;
@@ -92,6 +94,16 @@ export interface WaitKitMatchEvent extends WaitKitRequestEvent {
 
 export interface WaitKitErrorEvent extends WaitKitMatchEvent {
   error: Error;
+}
+
+/**
+ * How the simulated part of a request ended. `passthrough` means Waitkit handed the request
+ * to the real fetch; what the network does after that is not reported.
+ */
+export type WaitKitSettleResult = 'passthrough' | 'error' | 'timeout' | 'aborted';
+
+export interface WaitKitSettleEvent extends WaitKitMatchEvent {
+  result: WaitKitSettleResult;
 }
 
 export type WaitKitChangeReason =
@@ -113,6 +125,7 @@ export interface WaitKitEventMap {
   delayStart: WaitKitMatchEvent;
   delayEnd: WaitKitMatchEvent;
   error: WaitKitErrorEvent;
+  settle: WaitKitSettleEvent;
   change: WaitKitChangeEvent;
 }
 

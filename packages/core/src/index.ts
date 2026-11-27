@@ -29,6 +29,8 @@ export type {
   WaitKitOutcome,
   WaitKitRequestEvent,
   WaitKitRule,
+  WaitKitSettleEvent,
+  WaitKitSettleResult,
   WaitKitState,
   WaitKitTimeoutEffect,
   WaitKitValidationIssue,
